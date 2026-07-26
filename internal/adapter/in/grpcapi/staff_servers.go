@@ -3,8 +3,8 @@ package grpcapi
 import (
 	"context"
 
-	walletv1 "github.com/MS-Arcadia/arcadia-platform/gen/arcadia/wallet/v1"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
+	walletv1 "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/wallet/v1"
 	"google.golang.org/grpc"
 )
 

@@ -16,14 +16,14 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/event"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/kafkax"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/event"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/kafkax"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // Inbound event and command types this service handles.

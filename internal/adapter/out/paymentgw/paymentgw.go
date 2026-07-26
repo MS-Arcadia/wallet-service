@@ -11,11 +11,11 @@ import (
 	"log/slog"
 	"time"
 
-	commonv1 "github.com/MS-Arcadia/arcadia-platform/gen/arcadia/common/v1"
-	paymentv1 "github.com/MS-Arcadia/arcadia-platform/gen/arcadia/payment/v1"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
+	commonv1 "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/common/v1"
+	paymentv1 "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/payment/v1"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 	"google.golang.org/grpc"
 )
 

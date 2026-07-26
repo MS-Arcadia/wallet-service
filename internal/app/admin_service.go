@@ -5,13 +5,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/interest"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // reconcileBatchSize and accrualBatchSize page the maintenance jobs so that memory

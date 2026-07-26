@@ -3,8 +3,8 @@ package wallet
 import (
 	"errors"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // Reason codes are stable, machine-readable discriminators. Clients — the Store

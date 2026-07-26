@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
 )
 
 // Window names, which double as the rate-limiter rule names.

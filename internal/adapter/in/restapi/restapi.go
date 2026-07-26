@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/httpx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/giftcard"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/hold"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/httpx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // API holds the handlers.

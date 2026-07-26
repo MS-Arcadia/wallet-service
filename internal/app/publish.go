@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/event"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/ledger"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/event"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // Event types published by this service. These strings are a public contract:

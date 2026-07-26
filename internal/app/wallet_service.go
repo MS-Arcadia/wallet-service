@@ -5,15 +5,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/clock"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/hold"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/ledger"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/clock"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // Paging defaults applied to every list endpoint.

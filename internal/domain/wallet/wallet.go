@@ -9,8 +9,8 @@ package wallet
 import (
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // Status is the wallet's lifecycle state.

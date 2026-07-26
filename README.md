@@ -9,35 +9,30 @@ Go, clean architecture, gRPC and REST, Kafka, PostgreSQL.
 
 ## Quick start
 
-The service needs Postgres, Redis and Kafka. The [infra](../infra) repository brings all
-three up:
+This repository is self-contained: `go build ./...` and `docker build .` both work with
+nothing else checked out.
 
 ```bash
-cd ../infra && make up
+make test          # unit tests, race detector, needs no infrastructure
+make docker        # build the image
 ```
 
-Then:
+To run it, the service needs Postgres, Redis and Kafka, which the [infra](../infra)
+repository starts:
 
 ```bash
-curl -s localhost:8080/readyz | jq
+cd ../infra && make images && make up
+curl -s localhost:8080/readyz
 ```
 
 To exercise the API, import [`api/postman`](api/postman) into Postman, select the
 **Arcadia Local** environment, and run **Setup → Mint tokens**. The collection signs its
 own JWTs, so nothing else needs to be running.
 
-Running it from your own machine instead of the container:
-
 ```bash
-cd ../infra && make up-data     # just Postgres, Redis and Kafka
-cd ../wallet-service && make run
-```
-
-```bash
-make test          # unit tests, race detector, no infrastructure needed
-make cover         # coverage per package
-make lint          # vet plus staticcheck
-make docker        # build the image
+make cover   # coverage per package
+make lint    # vet plus staticcheck
+make proto   # regenerate internal/pb from api/proto
 ```
 
 ---
@@ -65,31 +60,60 @@ Clean architecture, with the dependency rule enforced by the package layout: not
 `domain` or `app` imports a driver, a broker client or a transport.
 
 ```
-cmd/wallet-service/          the binary: load config, build, run
+cmd/wallet-service/     the binary: load config, build, run
+api/proto/              the gRPC contract (.proto), compiled by `make proto`
 internal/
-├── domain/                  the business rules. No imports outside the platform's
-│   ├── wallet/              money and error types.
-│   ├── ledger/              ├─ Wallet: the balance and its invariants
-│   ├── giftcard/            ├─ Ledger: immutable entries
-│   ├── discount/            ├─ GiftCard, DiscountCode, Hold
-│   ├── hold/                ├─ abuse: the gift-card policy
-│   ├── abuse/               └─ interest: the accrual policy
-│   └── interest/
-├── app/                     use cases. Orchestrates aggregates, records movements,
-│   ├── port/                publishes events. Depends only on interfaces in port/.
-│   └── apptest/             in-memory fakes for every port
+├── domain/             the business rules — Wallet, Ledger, GiftCard, DiscountCode,
+│                       Hold, and the abuse and interest policies. Imports nothing
+│                       outside internal/platform's money and error types.
+├── app/                use cases. Orchestrates aggregates, records movements, publishes
+│   ├── port/           events. Depends only on the interfaces in port/.
+│   └── apptest/        in-memory fakes for every port
 ├── adapter/
-│   ├── in/grpcapi/          gRPC server  ─┐
-│   ├── in/restapi/          REST handlers ─┼─ three inbound adapters over one
-│   ├── in/consumer/         Kafka handlers ┘  application layer
-│   ├── out/repo/            PostgreSQL repositories
-│   ├── out/publisher/       the transactional outbox
-│   ├── out/ratelimit/       Redis sliding windows
-│   └── out/paymentgw/       gRPC client to the payment adapter
-├── config/                  environment loading, with validation that fails at boot
-└── bootstrap/               the only place that chooses concrete infrastructure
-migrations/                  versioned SQL, embedded in the binary
+│   ├── in/grpcapi/     gRPC server   ─┐
+│   ├── in/restapi/     REST handlers ─┼─ three inbound adapters over one application
+│   ├── in/consumer/    Kafka handlers ┘  layer
+│   ├── out/repo/       PostgreSQL repositories
+│   ├── out/publisher/  the transactional outbox
+│   ├── out/ratelimit/  Redis sliding windows
+│   └── out/paymentgw/  gRPC client to the payment adapter
+├── platform/           general-purpose plumbing — see below
+├── pb/                 generated from api/proto; committed, do not edit
+├── config/             environment loading, with validation that fails at boot
+└── bootstrap/          the only place that chooses concrete infrastructure
+migrations/             versioned SQL, embedded in the binary
 ```
+
+### What `internal/platform` is
+
+Plumbing with no business knowledge in it. It is the code that would otherwise be
+scattered through the adapters: an exact money type, an error taxonomy, the outbox
+machinery, JWT verification, the HTTP and gRPC server setup, structured logging,
+embedded migrations, the process lifecycle.
+
+It lives inside the service rather than in a shared repository because the platform has
+two services, not fourteen. A shared module would mean a `replace` directive to a sibling
+checkout, a Docker build context spanning two repositories, and CI checking out both —
+real, daily cost, paid to avoid duplicating a few thousand lines between two codebases.
+When a third service arrives, extracting this directory into a published module is a
+short job, and at that point it can be a properly versioned dependency instead of a path
+reference.
+
+| Package | |
+|---|---|
+| `money` | Integer minor units, basis points for rates, largest-remainder allocation |
+| `errs` | The error taxonomy, translated to gRPC or RFC 7807 at the edge |
+| `outbox` | Events written in the caller's transaction, drained by a dispatcher |
+| `event` | The envelope every published message shares |
+| `postgres` | Connection pool and the transaction manager the outbox depends on |
+| `kafkax` | Producer with `acks=all`; consumer groups with retries and dead-lettering |
+| `authn` | JWT verification with a pinned algorithm, and the RBAC helpers |
+| `httpx` / `grpcx` | The two transports, with matching middleware chains |
+| `logx` | Structured JSON with correlation ids, and redaction by key name |
+| `migrate` | Embedded SQL migrations, checksummed, behind an advisory lock |
+| `redisx` | The client and the sliding-window rate limiter |
+| `metrics` / `health` | Prometheus series, and liveness/readiness as separate things |
+| `config` / `clock` / `idgen` / `runtimex` | Environment loading, injectable time, UUIDv7, process lifecycle |
 
 Three inbound adapters sit on the same use cases. That is what makes
 `SERVER_MODE=grpc|http|both` a configuration change rather than a rewrite, and it is why
@@ -152,8 +176,9 @@ a wallet has been debited and nothing knows about it.
 
 A background dispatcher drains the table with `FOR UPDATE SKIP LOCKED`, so several
 replicas share the work without publishing the same message twice. Delivery is
-at-least-once; the receiving side's `processed_events` table turns that into
-effectively-exactly-once.
+at-least-once, which the receiving side turns into effectively-exactly-once by using the
+event id as its idempotency key — the same mechanism that protects a retried HTTP request,
+rather than a second table doing the same job.
 
 ### An insufficient balance is an event, not just an error
 
@@ -196,6 +221,17 @@ The idempotency key is `interest:<wallet>:<date>`, so re-running a day — after
 because an operator replayed it — pays nothing extra. Amounts round down, so the platform
 can never over-pay.
 
+### Correlation ids instead of distributed tracing
+
+Every request carries a correlation id — generated at the edge, propagated through
+`X-Correlation-Id`, gRPC metadata and the Kafka envelope — and every log line includes it.
+Grepping one id gives the full story of a purchase across both services.
+
+There is no OpenTelemetry export. A tracing backend answers "where did the time go inside
+this request", which matters at a scale this platform is not at; it costs a collector, a
+trace store and a dependency tree. The correlation id answers the question that actually
+comes up — "show me everything that happened to this order" — for the price of one string.
+
 ### Liveness and readiness are different things
 
 `/livez` deliberately probes nothing: if it can answer, the process is alive. `/readyz`
@@ -210,7 +246,7 @@ That is the bulkhead tactic from the architecture document made concrete.
 ## API
 
 Both transports expose the same operations. gRPC is defined in
-[`infra/contracts/proto/arcadia/wallet/v1/wallet.proto`](../infra/contracts/proto/arcadia/wallet/v1/wallet.proto).
+[`api/proto/arcadia/wallet/v1/wallet.proto`](api/proto/arcadia/wallet/v1/wallet.proto).
 
 ### REST
 
@@ -250,6 +286,10 @@ Published on `wallet-events`: `WalletCreated`, `WalletDebited`, `WalletCredited`
 
 Consumed: `payment-events` (bank settlements), `user-events` (provision a wallet),
 `wallet-commands` (the Store saga), `trade-events` (marketplace settlement).
+
+Consumers deduplicate by using the event id as their idempotency key, so a redelivered
+message is handled at most once through the same mechanism that protects a retried HTTP
+request. There is no separate inbox table.
 
 ---
 

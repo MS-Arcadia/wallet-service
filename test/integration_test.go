@@ -27,17 +27,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/clock"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/idgen"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/migrate"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/postgres"
 	"github.com/MS-Arcadia/wallet-service/internal/adapter/out/repo"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/ledger"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/clock"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/idgen"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/migrate"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/postgres"
 	walletmigrations "github.com/MS-Arcadia/wallet-service/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -166,8 +166,7 @@ func TestMigrationsApplyAndAreIdempotent(t *testing.T) {
 	// Every table the service depends on exists.
 	for _, table := range []string{
 		"wallets", "ledger_entries", "gift_cards", "discount_codes",
-		"holds", "idempotency_keys", "outbox_messages", "processed_events",
-		"schema_migrations",
+		"holds", "idempotency_keys", "outbox_messages", "schema_migrations",
 	} {
 		var exists bool
 		err := f.pool.QueryRow(ctx,

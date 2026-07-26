@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/abuse"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

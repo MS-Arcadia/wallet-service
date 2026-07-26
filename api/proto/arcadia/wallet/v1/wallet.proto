@@ -1,0 +1,473 @@
+syntax = "proto3";
+
+package arcadia.wallet.v1;
+
+import "arcadia/common/v1/common.proto";
+
+option go_package = "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/wallet/v1;walletv1";
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum WalletStatus {
+  WALLET_STATUS_UNSPECIFIED = 0;
+  WALLET_STATUS_ACTIVE = 1;
+  // Frozen wallets reject debits and credits; used while Support investigates
+  // gift-card abuse or a disputed transaction.
+  WALLET_STATUS_FROZEN = 2;
+  WALLET_STATUS_CLOSED = 3;
+}
+
+enum LedgerDirection {
+  LEDGER_DIRECTION_UNSPECIFIED = 0;
+  LEDGER_DIRECTION_DEBIT = 1;
+  LEDGER_DIRECTION_CREDIT = 2;
+}
+
+// LedgerReason explains *why* money moved. It is part of the immutable audit
+// trail and must never be reused with a different meaning.
+enum LedgerReason {
+  LEDGER_REASON_UNSPECIFIED = 0;
+  LEDGER_REASON_PURCHASE = 1;      // debit: buying a game
+  LEDGER_REASON_REVENUE = 2;       // credit: developer / platform revenue share
+  LEDGER_REASON_REFUND = 3;        // credit: money returned to a buyer
+  LEDGER_REASON_REVERSAL = 4;      // debit: clawing back a previous credit
+  LEDGER_REASON_CHARGE = 5;        // credit: top-up through the bank gateway
+  LEDGER_REASON_GIFTCARD = 6;      // credit: gift-card redemption
+  LEDGER_REASON_TRADE = 7;         // marketplace item settlement (both sides)
+  LEDGER_REASON_DISCOUNT = 8;      // credit: discount / promotional grant
+  LEDGER_REASON_INTEREST = 9;      // credit: interest accrued on the balance
+  LEDGER_REASON_HOLD_CAPTURE = 10; // debit: a previously held amount was captured
+  LEDGER_REASON_ADJUSTMENT = 11;   // manual correction by an operator (audited)
+}
+
+enum HoldStatus {
+  HOLD_STATUS_UNSPECIFIED = 0;
+  HOLD_STATUS_ACTIVE = 1;
+  HOLD_STATUS_CAPTURED = 2;
+  HOLD_STATUS_RELEASED = 3;
+  HOLD_STATUS_EXPIRED = 4;
+}
+
+enum GiftCardStatus {
+  GIFT_CARD_STATUS_UNSPECIFIED = 0;
+  GIFT_CARD_STATUS_ACTIVE = 1;
+  GIFT_CARD_STATUS_USED = 2;
+  GIFT_CARD_STATUS_REVOKED = 3;
+}
+
+enum DiscountCodeStatus {
+  DISCOUNT_CODE_STATUS_UNSPECIFIED = 0;
+  DISCOUNT_CODE_STATUS_ACTIVE = 1;
+  DISCOUNT_CODE_STATUS_USED = 2;
+  DISCOUNT_CODE_STATUS_EXPIRED = 3;
+  DISCOUNT_CODE_STATUS_REVOKED = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Resources
+// ---------------------------------------------------------------------------
+
+message Wallet {
+  string id = 1;
+  string user_id = 2;
+  arcadia.common.v1.Money balance = 3;
+  // Sum of all ACTIVE holds. available = balance - held.
+  arcadia.common.v1.Money held = 4;
+  arcadia.common.v1.Money available = 5;
+  WalletStatus status = 6;
+  // Optimistic-concurrency version, incremented on every balance mutation.
+  int64 version = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message LedgerEntry {
+  string id = 1;
+  string wallet_id = 2;
+  LedgerDirection direction = 3;
+  arcadia.common.v1.Money amount = 4;
+  // Balance after this entry was applied — lets auditors replay the ledger
+  // without recomputing running totals.
+  arcadia.common.v1.Money balance_after = 5;
+  LedgerReason reason = 6;
+  // Correlating identifier in the owning service (order id, trade id, intent id).
+  string reference_id = 7;
+  string description = 8;
+  string correlation_id = 9;
+  string created_at = 10;
+}
+
+message Hold {
+  string id = 1;
+  string wallet_id = 2;
+  arcadia.common.v1.Money amount = 3;
+  HoldStatus status = 4;
+  string reference_id = 5;
+  string reason = 6;
+  string expires_at = 7;
+  string created_at = 8;
+  string resolved_at = 9;
+}
+
+message GiftCard {
+  string id = 1;
+  // Only ever returned to the Support user that issued it.
+  string code = 2;
+  arcadia.common.v1.Money value = 3;
+  GiftCardStatus status = 4;
+  string issued_by = 5;
+  string redeemed_by = 6;
+  string batch_id = 7;
+  string note = 8;
+  string created_at = 9;
+  string redeemed_at = 10;
+}
+
+message DiscountCode {
+  string id = 1;
+  string code = 2;
+  // Percentage off, in basis points (1% == 100 bps). Mutually exclusive with
+  // amount_off.
+  int32 percent_bps = 3;
+  arcadia.common.v1.Money amount_off = 4;
+  arcadia.common.v1.Money max_discount = 5;
+  arcadia.common.v1.Money min_order_amount = 6;
+  DiscountCodeStatus status = 7;
+  int32 max_redemptions = 8;
+  int32 redemption_count = 9;
+  string issued_by = 10;
+  string expires_at = 11;
+  string created_at = 12;
+}
+
+// ---------------------------------------------------------------------------
+// WalletService — user-facing and saga-participant operations.
+// ---------------------------------------------------------------------------
+
+service WalletService {
+  // Returns the caller's own wallet, provisioning it on first access.
+  rpc GetMyWallet(GetMyWalletRequest) returns (GetMyWalletResponse);
+  // Returns any wallet by user id. Requires SUPPORT or ADMIN.
+  rpc GetWallet(GetWalletRequest) returns (GetWalletResponse);
+
+  // Starts a bank top-up: creates a payment intent through the Payment Adapter
+  // and hands the redirect URL back to the client. The balance only changes
+  // once BankPaymentConfirmed arrives over Kafka.
+  rpc InitiateCharge(InitiateChargeRequest) returns (InitiateChargeResponse);
+
+  rpc RedeemGiftCard(RedeemGiftCardRequest) returns (RedeemGiftCardResponse);
+
+  rpc ListLedger(ListLedgerRequest) returns (ListLedgerResponse);
+
+  // --- Saga participants -------------------------------------------------
+  // These are exposed synchronously as well as over Kafka so that the Store
+  // service can choose either integration style. Every one of them requires an
+  // Idempotency-Key and is safe to retry.
+
+  rpc Debit(DebitRequest) returns (TransactionResponse);
+  rpc Credit(CreditRequest) returns (TransactionResponse);
+  // Atomic debit-of-one-wallet + credit-of-another, used for marketplace trade
+  // settlement. Either both sides move or neither does.
+  rpc Transfer(TransferRequest) returns (TransferResponse);
+
+  // --- Holds (pre-orders and instalments) --------------------------------
+  rpc HoldFunds(HoldFundsRequest) returns (HoldFundsResponse);
+  rpc CaptureHold(CaptureHoldRequest) returns (TransactionResponse);
+  rpc ReleaseHold(ReleaseHoldRequest) returns (ReleaseHoldResponse);
+  rpc ListHolds(ListHoldsRequest) returns (ListHoldsResponse);
+}
+
+message GetMyWalletRequest {}
+message GetMyWalletResponse { Wallet wallet = 1; }
+
+message GetWalletRequest { string user_id = 1; }
+message GetWalletResponse { Wallet wallet = 1; }
+
+message InitiateChargeRequest {
+  arcadia.common.v1.Money amount = 1;
+  // Where the bank should send the user back to after payment.
+  string return_url = 2;
+  string idempotency_key = 3;
+}
+message InitiateChargeResponse {
+  string payment_intent_id = 1;
+  string redirect_url = 2;
+  arcadia.common.v1.Money amount = 3;
+  string expires_at = 4;
+}
+
+message RedeemGiftCardRequest {
+  string code = 1;
+  string idempotency_key = 2;
+}
+message RedeemGiftCardResponse {
+  arcadia.common.v1.Money credited = 1;
+  Wallet wallet = 2;
+  LedgerEntry entry = 3;
+}
+
+message ListLedgerRequest {
+  // Empty means "the caller's own wallet". Requires SUPPORT/ADMIN otherwise.
+  string user_id = 1;
+  arcadia.common.v1.PageRequest page = 2;
+  repeated LedgerReason reasons = 3;
+  LedgerDirection direction = 4;
+  arcadia.common.v1.TimeRange range = 5;
+}
+message ListLedgerResponse {
+  repeated LedgerEntry entries = 1;
+  arcadia.common.v1.PageResponse page = 2;
+}
+
+message DebitRequest {
+  string user_id = 1;
+  arcadia.common.v1.Money amount = 2;
+  LedgerReason reason = 3;
+  string reference_id = 4;
+  string description = 5;
+  string idempotency_key = 6;
+}
+
+message CreditRequest {
+  string user_id = 1;
+  arcadia.common.v1.Money amount = 2;
+  LedgerReason reason = 3;
+  string reference_id = 4;
+  string description = 5;
+  string idempotency_key = 6;
+}
+
+message TransactionResponse {
+  LedgerEntry entry = 1;
+  Wallet wallet = 2;
+  // True when the request was recognised as a replay of an earlier call and no
+  // new money moved.
+  bool idempotent_replay = 3;
+}
+
+message TransferRequest {
+  string from_user_id = 1;
+  string to_user_id = 2;
+  arcadia.common.v1.Money amount = 3;
+  LedgerReason reason = 4;
+  string reference_id = 5;
+  string description = 6;
+  string idempotency_key = 7;
+}
+message TransferResponse {
+  LedgerEntry debit_entry = 1;
+  LedgerEntry credit_entry = 2;
+  bool idempotent_replay = 3;
+}
+
+message HoldFundsRequest {
+  string user_id = 1;
+  arcadia.common.v1.Money amount = 2;
+  string reference_id = 3;
+  string reason = 4;
+  // Optional TTL in seconds; the hold is auto-released when it expires.
+  int64 ttl_seconds = 5;
+  string idempotency_key = 6;
+}
+message HoldFundsResponse {
+  Hold hold = 1;
+  Wallet wallet = 2;
+  bool idempotent_replay = 3;
+}
+
+message CaptureHoldRequest {
+  string hold_id = 1;
+  // Optional partial capture. Omit to capture the full held amount.
+  arcadia.common.v1.Money amount = 2;
+  LedgerReason reason = 3;
+  string idempotency_key = 4;
+}
+
+message ReleaseHoldRequest {
+  string hold_id = 1;
+  string idempotency_key = 2;
+}
+message ReleaseHoldResponse {
+  Hold hold = 1;
+  Wallet wallet = 2;
+  bool idempotent_replay = 3;
+}
+
+message ListHoldsRequest {
+  string user_id = 1;
+  HoldStatus status = 2;
+  arcadia.common.v1.PageRequest page = 3;
+}
+message ListHoldsResponse {
+  repeated Hold holds = 1;
+  arcadia.common.v1.PageResponse page = 2;
+}
+
+// ---------------------------------------------------------------------------
+// GiftCardService — Support-only issuance and inspection.
+// ---------------------------------------------------------------------------
+
+service GiftCardService {
+  rpc IssueGiftCards(IssueGiftCardsRequest) returns (IssueGiftCardsResponse);
+  rpc GetGiftCard(GetGiftCardRequest) returns (GetGiftCardResponse);
+  rpc ListGiftCards(ListGiftCardsRequest) returns (ListGiftCardsResponse);
+  rpc RevokeGiftCard(RevokeGiftCardRequest) returns (RevokeGiftCardResponse);
+}
+
+message IssueGiftCardsRequest {
+  arcadia.common.v1.Money value = 1;
+  // Number of cards to mint in this batch. 1..1000.
+  int32 quantity = 2;
+  string note = 3;
+  string idempotency_key = 4;
+}
+message IssueGiftCardsResponse {
+  string batch_id = 1;
+  repeated GiftCard gift_cards = 2;
+}
+
+message GetGiftCardRequest {
+  // Either the id or the raw code.
+  string id = 1;
+  string code = 2;
+}
+message GetGiftCardResponse { GiftCard gift_card = 1; }
+
+message ListGiftCardsRequest {
+  GiftCardStatus status = 1;
+  string batch_id = 2;
+  arcadia.common.v1.PageRequest page = 3;
+}
+message ListGiftCardsResponse {
+  repeated GiftCard gift_cards = 1;
+  arcadia.common.v1.PageResponse page = 2;
+}
+
+message RevokeGiftCardRequest {
+  string id = 1;
+  string reason = 2;
+}
+message RevokeGiftCardResponse { GiftCard gift_card = 1; }
+
+// ---------------------------------------------------------------------------
+// DiscountService — promotional codes (Support/Admin issue, users redeem).
+// ---------------------------------------------------------------------------
+
+service DiscountService {
+  rpc IssueDiscountCode(IssueDiscountCodeRequest) returns (IssueDiscountCodeResponse);
+  // Computes what a code would do to an order without consuming it. Safe to
+  // call from the Store service on every checkout preview.
+  rpc PreviewDiscount(PreviewDiscountRequest) returns (PreviewDiscountResponse);
+  // Consumes one redemption of the code. Idempotent per reference_id.
+  rpc RedeemDiscountCode(RedeemDiscountCodeRequest) returns (RedeemDiscountCodeResponse);
+  rpc GetDiscountCode(GetDiscountCodeRequest) returns (GetDiscountCodeResponse);
+}
+
+message IssueDiscountCodeRequest {
+  string code = 1; // optional; generated when empty
+  int32 percent_bps = 2;
+  arcadia.common.v1.Money amount_off = 3;
+  arcadia.common.v1.Money max_discount = 4;
+  arcadia.common.v1.Money min_order_amount = 5;
+  int32 max_redemptions = 6;
+  string expires_at = 7;
+  string idempotency_key = 8;
+}
+message IssueDiscountCodeResponse { DiscountCode discount_code = 1; }
+
+message PreviewDiscountRequest {
+  string code = 1;
+  arcadia.common.v1.Money order_amount = 2;
+}
+message PreviewDiscountResponse {
+  arcadia.common.v1.Money discount = 1;
+  arcadia.common.v1.Money payable = 2;
+  DiscountCode discount_code = 3;
+}
+
+message RedeemDiscountCodeRequest {
+  string code = 1;
+  arcadia.common.v1.Money order_amount = 2;
+  string reference_id = 3;
+  string idempotency_key = 4;
+}
+message RedeemDiscountCodeResponse {
+  arcadia.common.v1.Money discount = 1;
+  arcadia.common.v1.Money payable = 2;
+  bool idempotent_replay = 3;
+}
+
+message GetDiscountCodeRequest { string code = 1; }
+message GetDiscountCodeResponse { DiscountCode discount_code = 1; }
+
+// ---------------------------------------------------------------------------
+// WalletAdminService — operational tooling. ADMIN only.
+// ---------------------------------------------------------------------------
+
+service WalletAdminService {
+  // Verifies that every wallet balance equals the sum of its ledger entries.
+  // Any mismatch is a P1 incident (see the SLO table in the architecture doc).
+  rpc Reconcile(ReconcileRequest) returns (ReconcileResponse);
+  // Runs an interest accrual cycle over eligible balances. Normally invoked by
+  // the internal scheduler; exposed for manual replay and testing.
+  rpc AccrueInterest(AccrueInterestRequest) returns (AccrueInterestResponse);
+  rpc FreezeWallet(FreezeWalletRequest) returns (FreezeWalletResponse);
+  rpc UnfreezeWallet(UnfreezeWalletRequest) returns (UnfreezeWalletResponse);
+  // Manual balance correction. Always writes a LEDGER_REASON_ADJUSTMENT entry
+  // attributed to the calling operator.
+  rpc Adjust(AdjustRequest) returns (TransactionResponse);
+}
+
+message ReconcileRequest {
+  // Limits the scan to a single wallet when set.
+  string user_id = 1;
+}
+message ReconcileResponse {
+  int64 wallets_checked = 1;
+  repeated ReconcileMismatch mismatches = 2;
+}
+message ReconcileMismatch {
+  string wallet_id = 1;
+  string user_id = 2;
+  arcadia.common.v1.Money stored_balance = 3;
+  arcadia.common.v1.Money ledger_balance = 4;
+  arcadia.common.v1.Money delta = 5;
+}
+
+message AccrueInterestRequest {
+  // Accrual date (RFC3339 date). Defaults to today. Re-running the same date is
+  // a no-op thanks to the per-wallet-per-date idempotency key.
+  string accrual_date = 1;
+  // Overrides the configured annual rate, in basis points.
+  int32 annual_rate_bps = 2;
+  bool dry_run = 3;
+}
+message AccrueInterestResponse {
+  int64 wallets_processed = 1;
+  int64 wallets_credited = 2;
+  arcadia.common.v1.Money total_interest = 3;
+  string accrual_date = 4;
+  bool dry_run = 5;
+}
+
+message FreezeWalletRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+message FreezeWalletResponse { Wallet wallet = 1; }
+
+message UnfreezeWalletRequest {
+  string user_id = 1;
+  string reason = 2;
+}
+message UnfreezeWalletResponse { Wallet wallet = 1; }
+
+message AdjustRequest {
+  string user_id = 1;
+  LedgerDirection direction = 2;
+  arcadia.common.v1.Money amount = 3;
+  string reason = 4; // free-text justification, stored on the ledger entry
+  string idempotency_key = 5;
+}

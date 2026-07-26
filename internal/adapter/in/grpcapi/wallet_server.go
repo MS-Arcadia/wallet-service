@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	walletv1 "github.com/MS-Arcadia/arcadia-platform/gen/arcadia/wallet/v1"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/grpcx"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	walletv1 "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/wallet/v1"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/grpcx"
 	"google.golang.org/grpc"
 )
 

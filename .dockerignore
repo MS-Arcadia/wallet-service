@@ -1,16 +1,18 @@
-# Everything the image does not need. A smaller build context is a faster build and a
-# smaller attack surface.
+# Everything the image does not need. A smaller context is a faster build and a smaller
+# attack surface.
 .git
 .github
 **/*_test.go
 **/testdata
-api/postman
-docs
+# The .proto files are only used by `make proto`; internal/pb is what the build compiles.
+api/
+test/
+docs/
 *.md
 Makefile
-.dockerignore
 Dockerfile
+.dockerignore
 .env
 .env.*
 coverage.out
-*.log
+bin/

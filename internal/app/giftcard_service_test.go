@@ -3,11 +3,11 @@ package app_test
 import (
 	"testing"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/abuse"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/giftcard"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

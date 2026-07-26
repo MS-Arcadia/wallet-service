@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package arcadia.common.v1;
+
+option go_package = "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/common/v1;commonv1";
+
+// Money is the canonical monetary value across every Arcadia service.
+//
+// Amounts are ALWAYS expressed in the minor unit of the currency (e.g. Rial has
+// no minor unit so minor == major; USD cents). Floating point is never used for
+// money anywhere in the platform.
+message Money {
+  // Amount in minor units. May be negative in reports, never in a balance.
+  int64 amount_minor = 1;
+  // ISO-4217 alphabetic code, e.g. "IRR", "USD".
+  string currency = 2;
+}
+
+// PageRequest is a cursor+offset hybrid used by list endpoints.
+message PageRequest {
+  // 1-based page number. Defaults to 1.
+  int32 page = 1;
+  // Items per page. Defaults to 20, capped at 100.
+  int32 page_size = 2;
+}
+
+message PageResponse {
+  int32 page = 1;
+  int32 page_size = 2;
+  int64 total_items = 3;
+  int32 total_pages = 4;
+}
+
+// TimeRange is an inclusive-exclusive [from, to) filter.
+message TimeRange {
+  string from = 1; // RFC3339, optional
+  string to = 2;   // RFC3339, optional
+}

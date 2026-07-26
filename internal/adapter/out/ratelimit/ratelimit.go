@@ -9,9 +9,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/redisx"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/abuse"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/redisx"
 )
 
 // GiftCardLimiter counts failed gift-card redemption attempts per user.

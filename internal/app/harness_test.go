@@ -5,17 +5,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/clock"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/idgen"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/app/apptest"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/abuse"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/giftcard"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/interest"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/clock"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/idgen"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 	"github.com/stretchr/testify/require"
 )
 

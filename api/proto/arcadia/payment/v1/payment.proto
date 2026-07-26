@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package arcadia.payment.v1;
+
+import "arcadia/common/v1/common.proto";
+
+option go_package = "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/payment/v1;paymentv1";
+
+// PaymentIntentState is the state machine of a single bank top-up attempt.
+//
+//   CREATED ──► PENDING ──► CONFIRMED
+//                  │  └────► FAILED
+//                  └───────► EXPIRED
+//   CREATED/PENDING ──────► CANCELED
+//
+// CONFIRMED, FAILED, EXPIRED and CANCELED are terminal.
+enum PaymentIntentState {
+  PAYMENT_INTENT_STATE_UNSPECIFIED = 0;
+  PAYMENT_INTENT_STATE_CREATED = 1;
+  PAYMENT_INTENT_STATE_PENDING = 2;
+  PAYMENT_INTENT_STATE_CONFIRMED = 3;
+  PAYMENT_INTENT_STATE_FAILED = 4;
+  PAYMENT_INTENT_STATE_EXPIRED = 5;
+  PAYMENT_INTENT_STATE_CANCELED = 6;
+}
+
+enum PaymentPurpose {
+  PAYMENT_PURPOSE_UNSPECIFIED = 0;
+  PAYMENT_PURPOSE_WALLET_TOPUP = 1;
+}
+
+message PaymentIntent {
+  string id = 1;
+  string user_id = 2;
+  arcadia.common.v1.Money amount = 3;
+  PaymentIntentState state = 4;
+  PaymentPurpose purpose = 5;
+  // Provider-side identifier (authority / token / reference number).
+  string gateway_ref = 6;
+  string gateway_name = 7;
+  // URL the user must visit to authorise the payment.
+  string redirect_url = 8;
+  string return_url = 9;
+  // Bank's own transaction id, only present once settled.
+  string bank_reference = 10;
+  string failure_code = 11;
+  string failure_reason = 12;
+  string created_at = 13;
+  string updated_at = 14;
+  string expires_at = 15;
+  string settled_at = 16;
+}
+
+service PaymentService {
+  // Creates an intent and asks the gateway for an authorisation URL. Idempotent
+  // on idempotency_key.
+  rpc InitiatePayment(InitiatePaymentRequest) returns (InitiatePaymentResponse);
+  rpc GetPaymentIntent(GetPaymentIntentRequest) returns (GetPaymentIntentResponse);
+  rpc ListPaymentIntents(ListPaymentIntentsRequest) returns (ListPaymentIntentsResponse);
+  rpc CancelPaymentIntent(CancelPaymentIntentRequest) returns (CancelPaymentIntentResponse);
+  // Actively asks the bank about an intent instead of waiting for the callback.
+  // Used by the reconciliation job for intents stuck in PENDING and by clients
+  // returning from the gateway.
+  rpc VerifyPayment(VerifyPaymentRequest) returns (VerifyPaymentResponse);
+}
+
+message InitiatePaymentRequest {
+  string user_id = 1;
+  arcadia.common.v1.Money amount = 2;
+  PaymentPurpose purpose = 3;
+  string return_url = 4;
+  // Free-form key/value pairs echoed back on the resulting events.
+  map<string, string> metadata = 5;
+  string idempotency_key = 6;
+}
+message InitiatePaymentResponse {
+  PaymentIntent intent = 1;
+  bool idempotent_replay = 2;
+}
+
+message GetPaymentIntentRequest { string id = 1; }
+message GetPaymentIntentResponse { PaymentIntent intent = 1; }
+
+message ListPaymentIntentsRequest {
+  string user_id = 1;
+  PaymentIntentState state = 2;
+  arcadia.common.v1.PageRequest page = 3;
+  arcadia.common.v1.TimeRange range = 4;
+}
+message ListPaymentIntentsResponse {
+  repeated PaymentIntent intents = 1;
+  arcadia.common.v1.PageResponse page = 2;
+}
+
+message CancelPaymentIntentRequest {
+  string id = 1;
+  string reason = 2;
+}
+message CancelPaymentIntentResponse { PaymentIntent intent = 1; }
+
+message VerifyPaymentRequest {
+  string id = 1;
+}
+message VerifyPaymentResponse {
+  PaymentIntent intent = 1;
+  // False when the bank still reports the payment as in-flight.
+  bool settled = 2;
+}

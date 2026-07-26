@@ -1,11 +1,12 @@
 -- Idempotency bookkeeping, the transactional outbox, and consumer deduplication.
 --
--- These three tables are the machinery behind the platform's exactly-once
--- guarantee for financial operations:
+-- Together these two are the machinery behind the platform's exactly-once guarantee for
+-- financial operations:
 --
---   idempotency_keys  a client request takes effect at most once
+--   idempotency_keys  a client request takes effect at most once — and because a Kafka
+--                     consumer uses the event id as its key, a redelivered event is
+--                     handled at most once by the same mechanism
 --   outbox_messages   a state change and its announcement commit together
---   processed_events  an at-least-once delivery is handled at most once
 
 CREATE TABLE idempotency_keys (
     key          TEXT        NOT NULL,
@@ -82,21 +83,3 @@ CREATE INDEX outbox_published_idx ON outbox_messages (published_at)
 -- and each one needs an operator.
 CREATE INDEX outbox_failed_idx ON outbox_messages (created_at)
     WHERE status = 'FAILED';
-
--- ---------------------------------------------------------------------------
-
-CREATE TABLE processed_events (
-    event_id     UUID        NOT NULL,
-    -- consumer names the logical handler, so that two independent consumers of the
-    -- same event do not shadow each other's bookkeeping.
-    consumer     TEXT        NOT NULL,
-    event_type   TEXT        NOT NULL DEFAULT '',
-    processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    PRIMARY KEY (event_id, consumer)
-);
-
-COMMENT ON TABLE processed_events IS
-    'Consumer inbox. Recording an event id in the same transaction as its effect turns at-least-once delivery into exactly-once processing.';
-
-CREATE INDEX processed_events_processed_at_idx ON processed_events (processed_at);

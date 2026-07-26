@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/config"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/config"
 )
 
 // ServerMode selects which inbound transports to serve.
@@ -34,16 +34,15 @@ func (m ServerMode) ServesHTTP() bool { return m == ModeHTTP || m == ModeBoth }
 
 // Config is the complete service configuration.
 type Config struct {
-	Service   ServiceConfig
-	Server    ServerConfig
-	Database  DatabaseConfig
-	Redis     RedisConfig
-	Kafka     KafkaConfig
-	Auth      AuthConfig
-	Wallet    WalletConfig
-	Payment   PaymentConfig
-	Telemetry TelemetryConfig
-	Jobs      JobsConfig
+	Service  ServiceConfig
+	Server   ServerConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	Kafka    KafkaConfig
+	Auth     AuthConfig
+	Wallet   WalletConfig
+	Payment  PaymentConfig
+	Jobs     JobsConfig
 }
 
 // ServiceConfig identifies the running instance.
@@ -162,14 +161,6 @@ type PaymentConfig struct {
 	Timeout    time.Duration
 }
 
-// TelemetryConfig configures OpenTelemetry export.
-type TelemetryConfig struct {
-	Enabled      bool
-	OTLPEndpoint string
-	Insecure     bool
-	SampleRatio  float64
-}
-
 // JobsConfig configures the background schedulers.
 type JobsConfig struct {
 	// ReconcileInterval is how often balances are checked against the ledger.
@@ -286,13 +277,6 @@ func Load() (Config, error) {
 			Timeout:    l.Duration("PAYMENT_SERVICE_TIMEOUT", 10*time.Second),
 		},
 
-		Telemetry: TelemetryConfig{
-			Enabled:      l.Bool("OTEL_ENABLED", false),
-			OTLPEndpoint: l.String("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
-			Insecure:     l.Bool("OTEL_EXPORTER_OTLP_INSECURE", true),
-			SampleRatio:  float64(l.Int("OTEL_TRACE_SAMPLE_PERCENT", 100)) / 100.0,
-		},
-
 		Jobs: JobsConfig{
 			ReconcileInterval:     l.Duration("JOB_RECONCILE_INTERVAL", 15*time.Minute),
 			InterestInterval:      l.Duration("JOB_INTEREST_INTERVAL", 24*time.Hour),
@@ -342,9 +326,6 @@ func (c Config) validate() error {
 	}
 	if len(c.Wallet.Currency) != 3 {
 		return fmt.Errorf("WALLET_CURRENCY must be a 3-letter ISO-4217 code, got %q", c.Wallet.Currency)
-	}
-	if c.Telemetry.Enabled && c.Telemetry.OTLPEndpoint == "" {
-		return fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT is required when OTEL_ENABLED is true")
 	}
 	return nil
 }

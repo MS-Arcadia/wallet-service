@@ -11,12 +11,12 @@ package app
 import (
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/discount"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/giftcard"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/hold"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/ledger"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // The DTOs below are the application layer's own vocabulary. Aggregates are not

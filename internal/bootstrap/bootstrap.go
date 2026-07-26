@@ -14,23 +14,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/authn"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/clock"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/grpcx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/health"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/httpx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/idgen"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/kafkax"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/logx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/metrics"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/migrate"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/otelx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/outbox"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/postgres"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/redisx"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/runtimex"
 	"github.com/MS-Arcadia/wallet-service/internal/adapter/in/consumer"
 	"github.com/MS-Arcadia/wallet-service/internal/adapter/in/grpcapi"
 	"github.com/MS-Arcadia/wallet-service/internal/adapter/in/restapi"
@@ -44,20 +27,35 @@ import (
 	"github.com/MS-Arcadia/wallet-service/internal/domain/abuse"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/giftcard"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/interest"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/authn"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/clock"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/grpcx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/health"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/httpx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/idgen"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/kafkax"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/logx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/metrics"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/migrate"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/outbox"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/postgres"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/redisx"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/runtimex"
 	walletmigrations "github.com/MS-Arcadia/wallet-service/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // App is the assembled service.
 type App struct {
-	cfg       config.Config
-	logger    *slog.Logger
-	pool      *pgxpool.Pool
-	redis     *redisx.Client
-	producer  *kafkax.Producer
-	metrics   *metrics.Registry
-	health    *health.Registry
-	telemetry *otelx.Providers
+	cfg      config.Config
+	logger   *slog.Logger
+	pool     *pgxpool.Pool
+	redis    *redisx.Client
+	producer *kafkax.Producer
+	metrics  *metrics.Registry
+	health   *health.Registry
 
 	dispatcher *outbox.Dispatcher
 	consumers  []*kafkax.Consumer
@@ -92,9 +90,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		health:  health.NewRegistry(cfg.Service.Name, cfg.Service.Version),
 	}
 
-	if err := application.initTelemetry(ctx); err != nil {
-		return nil, err
-	}
 	if err := application.initDatabase(ctx); err != nil {
 		return nil, err
 	}
@@ -113,24 +108,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	application.initConsumers()
 
 	return application, nil
-}
-
-func (a *App) initTelemetry(ctx context.Context) error {
-	providers, err := otelx.Setup(ctx, otelx.Config{
-		Enabled:        a.cfg.Telemetry.Enabled,
-		OTLPEndpoint:   a.cfg.Telemetry.OTLPEndpoint,
-		Insecure:       a.cfg.Telemetry.Insecure,
-		ServiceName:    a.cfg.Service.Name,
-		ServiceVersion: a.cfg.Service.Version,
-		Environment:    a.cfg.Service.Environment,
-		SampleRatio:    a.cfg.Telemetry.SampleRatio,
-	}, a.logger)
-	if err != nil {
-		return fmt.Errorf("bootstrap: telemetry: %w", err)
-	}
-	a.telemetry = providers
-	a.closers = append(a.closers, providers.Shutdown)
-	return nil
 }
 
 func (a *App) initDatabase(ctx context.Context) error {
@@ -502,7 +479,6 @@ func (a *App) buildHTTPHandler(verifier *authn.Verifier) http.Handler {
 		httpx.RequestID(),
 		httpx.SecurityHeaders(),
 		httpx.CORS(a.cfg.Server.CORSOrigins),
-		httpx.Tracing(a.cfg.Service.Name),
 		httpx.Logging(a.logger),
 		httpx.Instrument(a.metrics),
 		httpx.Timeout(a.cfg.Server.HandlerTimeout),

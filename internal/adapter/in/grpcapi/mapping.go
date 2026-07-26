@@ -9,15 +9,15 @@ package grpcapi
 import (
 	"time"
 
-	commonv1 "github.com/MS-Arcadia/arcadia-platform/gen/arcadia/common/v1"
-	walletv1 "github.com/MS-Arcadia/arcadia-platform/gen/arcadia/wallet/v1"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/discount"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/giftcard"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/hold"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/wallet"
+	commonv1 "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/common/v1"
+	walletv1 "github.com/MS-Arcadia/wallet-service/internal/pb/arcadia/wallet/v1"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
 )
 
 // --- Inbound conversions --------------------------------------------------

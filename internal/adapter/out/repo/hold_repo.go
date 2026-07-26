@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/money"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/postgres"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
 	"github.com/MS-Arcadia/wallet-service/internal/domain/hold"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/money"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/postgres"
 )
 
 // HoldRepo is the Postgres port.HoldRepository.

@@ -11,11 +11,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/MS-Arcadia/arcadia-platform/pkg/errs"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/event"
-	"github.com/MS-Arcadia/arcadia-platform/pkg/outbox"
 	"github.com/MS-Arcadia/wallet-service/internal/app"
 	"github.com/MS-Arcadia/wallet-service/internal/app/port"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/errs"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/event"
+	"github.com/MS-Arcadia/wallet-service/internal/platform/outbox"
 )
 
 // Topics names the Kafka topics this service produces to.
