@@ -1,0 +1,16 @@
+# Everything the image does not need. A smaller build context is a faster build and a
+# smaller attack surface.
+.git
+.github
+**/*_test.go
+**/testdata
+api/postman
+docs
+*.md
+Makefile
+.dockerignore
+Dockerfile
+.env
+.env.*
+coverage.out
+*.log
