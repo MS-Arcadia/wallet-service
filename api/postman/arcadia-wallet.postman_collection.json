@@ -7,7 +7,13 @@
   },
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{userToken}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{userToken}}",
+        "type": "string"
+      }
+    ]
   },
   "event": [
     {
@@ -40,22 +46,86 @@
     }
   ],
   "variable": [
-    { "key": "walletBase", "value": "http://localhost:8080", "type": "string" },
-    { "key": "paymentBase", "value": "http://localhost:8081", "type": "string" },
-    { "key": "idempotencyKey", "value": "", "type": "string" },
-    { "key": "pinnedIdempotencyKey", "value": "", "type": "string" },
-    { "key": "userToken", "value": "", "type": "string" },
-    { "key": "supportToken", "value": "", "type": "string" },
-    { "key": "adminToken", "value": "", "type": "string" },
-    { "key": "userId", "value": "11111111-1111-4111-8111-111111111111", "type": "string" },
-    { "key": "otherUserId", "value": "22222222-2222-4222-8222-222222222222", "type": "string" },
-    { "key": "supportId", "value": "33333333-3333-4333-8333-333333333333", "type": "string" },
-    { "key": "adminId", "value": "44444444-4444-4444-8444-444444444444", "type": "string" },
-    { "key": "giftCardCode", "value": "", "type": "string" },
-    { "key": "giftCardId", "value": "", "type": "string" },
-    { "key": "holdId", "value": "", "type": "string" },
-    { "key": "paymentIntentId", "value": "", "type": "string" },
-    { "key": "discountCode", "value": "SUMMER20", "type": "string" }
+    {
+      "key": "walletBase",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "paymentBase",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pinnedIdempotencyKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "supportToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "11111111-1111-4111-8111-111111111111",
+      "type": "string"
+    },
+    {
+      "key": "otherUserId",
+      "value": "22222222-2222-4222-8222-222222222222",
+      "type": "string"
+    },
+    {
+      "key": "supportId",
+      "value": "33333333-3333-4333-8333-333333333333",
+      "type": "string"
+    },
+    {
+      "key": "adminId",
+      "value": "44444444-4444-4444-8444-444444444444",
+      "type": "string"
+    },
+    {
+      "key": "giftCardCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "giftCardId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "holdId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentIntentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "discountCode",
+      "value": "SUMMER20",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -74,12 +144,16 @@
                   "// with, so the collection works without standing up the Auth service.",
                   "// Everything below is plain CryptoJS because Postman's sandbox has no JWT",
                   "// library.",
-                  "const CryptoJS = require('crypto-js');",
+                  "// `crypto-js` is bound to a local name because the Postman sandbox already",
+                  "// exposes CryptoJS as a global, and `const CryptoJS = ...` redeclares it —",
+                  "// which fails the whole script with \"Identifier already declared\" and every",
+                  "// request after it with a 401. Found by running the collection under newman.",
+                  "const cryptoJs = require('crypto-js');",
                   "const secret = pm.environment.get('jwtSecret');",
                   "if (!secret) { throw new Error('Set jwtSecret in the environment — it must match the services JWT_SECRET'); }",
                   "",
                   "function base64url(input) {",
-                  "    return CryptoJS.enc.Base64.stringify(input)",
+                  "    return cryptoJs.enc.Base64.stringify(input)",
                   "        .replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
                   "}",
                   "",
@@ -97,10 +171,10 @@
                   "        exp: now + 3600,",
                   "        jti: 'postman-' + now + '-' + role",
                   "    };",
-                  "    const encodedHeader = base64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
-                  "    const encodedClaims = base64url(CryptoJS.enc.Utf8.parse(JSON.stringify(claims)));",
+                  "    const encodedHeader = base64url(cryptoJs.enc.Utf8.parse(JSON.stringify(header)));",
+                  "    const encodedClaims = base64url(cryptoJs.enc.Utf8.parse(JSON.stringify(claims)));",
                   "    const signingInput = encodedHeader + '.' + encodedClaims;",
-                  "    const signature = base64url(CryptoJS.HmacSHA256(signingInput, secret));",
+                  "    const signature = base64url(cryptoJs.HmacSHA256(signingInput, secret));",
                   "    return signingInput + '.' + signature;",
                   "}",
                   "",
@@ -131,28 +205,58 @@
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{walletBase}}/readyz", "host": ["{{walletBase}}"], "path": ["readyz"] },
+            "url": {
+              "raw": "{{walletBase}}/readyz",
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "readyz"
+              ]
+            },
             "description": "Signs the tokens in a pre-request script, then confirms the service is ready. A DEGRADED status is acceptable: it means a non-critical dependency such as Redis is unavailable, and the service can still serve."
           }
         },
         {
           "name": "Liveness",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
-            "url": { "raw": "{{walletBase}}/livez", "host": ["{{walletBase}}"], "path": ["livez"] },
+            "url": {
+              "raw": "{{walletBase}}/livez",
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "livez"
+              ]
+            },
             "description": "Deliberately probes nothing. If this handler can answer, the process is alive. A database outage must fail readiness, not liveness — restarting the pod would not fix Postgres and would discard in-flight work."
           }
         },
         {
           "name": "Metrics",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
-            "url": { "raw": "{{walletBase}}/metrics", "host": ["{{walletBase}}"], "path": ["metrics"] },
+            "url": {
+              "raw": "{{walletBase}}/metrics",
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            },
             "description": "Prometheus exposition. The series worth looking at first are arcadia_ledger_mismatch_count (must be zero), arcadia_outbox_backlog and arcadia_events_dead_lettered_total."
           }
         }
@@ -186,7 +290,17 @@
           ],
           "request": {
             "method": "GET",
-            "url": { "raw": "{{walletBase}}/v1/wallets/me", "host": ["{{walletBase}}"], "path": ["v1", "wallets", "me"] },
+            "url": {
+              "raw": "{{walletBase}}/v1/wallets/me",
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "me"
+              ]
+            },
             "description": "Returns the caller's wallet, creating one on first access.\n\nLazy provisioning is deliberate: a wallet is also created when Auth publishes UserRegistered, but that event can be delayed by a broker hiccup and a user opening their wallet page must not see an error because of it. Both paths converge on the same unique constraint on user_id."
           }
         },
@@ -196,15 +310,44 @@
             "method": "GET",
             "url": {
               "raw": "{{walletBase}}/v1/wallets/me/ledger?page=1&page_size=20",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "me", "ledger"],
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "me",
+                "ledger"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "page_size", "value": "20" },
-                { "key": "reason", "value": "PURCHASE", "disabled": true },
-                { "key": "direction", "value": "DEBIT", "disabled": true },
-                { "key": "reference_id", "value": "order-1", "disabled": true },
-                { "key": "from", "value": "2026-07-01", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                },
+                {
+                  "key": "reason",
+                  "value": "PURCHASE",
+                  "disabled": true
+                },
+                {
+                  "key": "direction",
+                  "value": "DEBIT",
+                  "disabled": true
+                },
+                {
+                  "key": "reference_id",
+                  "value": "order-1",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-07-01",
+                  "disabled": true
+                }
               ]
             },
             "description": "The append-only transaction history, newest first.\n\nEach entry carries `balance_after`, so an auditor can verify the whole chain without recomputing running totals. Ordering is by an integer sequence rather than by timestamp: two entries written in the same transaction share a timestamp, and an unstable order would make paging skip or repeat rows.\n\nThe disabled query parameters are the filters a support agent uses; `reference_id` finds every entry for one order."
@@ -226,12 +369,26 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "GET",
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{userId}}",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{userId}}"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{userId}}"
+              ]
             },
             "description": "Support and Admin may read any wallet; a user may read only their own. Try swapping the token for {{userToken}} and pointing it at {{otherUserId}} — it returns 403."
           }
@@ -256,8 +413,14 @@
             "method": "GET",
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{otherUserId}}",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{otherUserId}}"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{otherUserId}}"
+              ]
             },
             "description": "A negative case, included on purpose. Getting this rule wrong once is how one customer ends up reading another customer's ledger."
           }
@@ -289,8 +452,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -298,8 +467,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/me/charges",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "me", "charges"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "me",
+                "charges"
+              ]
             },
             "description": "Asks the Payment Adapter for a bank authorisation URL.\n\n**No money moves here and the balance does not change.** It changes when the bank confirms and `BankPaymentConfirmed` reaches the wallet over Kafka. Crediting optimistically at this point would hand balance to everyone who merely opened the payment page.\n\nOpen the `redirect_url` from the response in a browser and click **Pay**. The sandbox signs its own callback, the payment service re-verifies it server-to-server, and the wallet is credited a moment later.\n\nChange the amount's last two digits to try the other outcomes: `…01` declines, `…03` never resolves so the reconciliation sweeper expires it."
           }
@@ -326,11 +502,25 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -338,8 +528,13 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/gift-cards",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "gift-cards"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "gift-cards"
+              ]
             },
             "description": "Mints gift cards. Support or Admin only.\n\n**The plaintext code appears in this response and nowhere else, ever.** Only a salted HMAC is stored, so a dump of the gift_cards table yields nothing spendable — and no later request, not even as Support, can reveal a code. Re-running this request with the same idempotency key returns the same card records with empty `code` fields, which is the honest answer.\n\nSet `quantity` up to 1000 to mint a batch."
           }
@@ -365,14 +560,31 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"code\": \"{{giftCardCode}}\"\n}" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{giftCardCode}}\"\n}"
+            },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/me/gift-cards/redeem",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "me", "gift-cards", "redeem"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "me",
+                "gift-cards",
+                "redeem"
+              ]
             },
             "description": "Credits a card's value to the caller's wallet.\n\nFormatting does not matter: lower case, extra spaces and missing dashes all resolve to the same card. Run it twice with *different* idempotency keys to see the double-redemption guard return 409 GIFT_CARD_ALREADY_USED — the card is locked FOR UPDATE and updated conditionally, so two concurrent redemptions cannot both succeed."
           }
@@ -401,14 +613,31 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"code\": \"ZZZZ-ZZZZ-ZZZZ-ZZZZ\"\n}" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"ZZZZ-ZZZZ-ZZZZ-ZZZZ\"\n}"
+            },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/me/gift-cards/redeem",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "me", "gift-cards", "redeem"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "me",
+                "gift-cards",
+                "redeem"
+              ]
             },
             "description": "An invalid code. The message is identical whether the code is unknown or malformed, so the endpoint cannot be used to enumerate live codes.\n\nSend it six times in a minute and the sixth returns **429** with `TOO_MANY_GIFT_CARD_ATTEMPTS` — the sliding-window limiter from the requirements (five a minute, thirty an hour). At ten failures in the hour the service publishes `GiftCardAbuseDetected`, which queues the user for Support review. Note that the service never bans anybody itself: a human decides."
           }
@@ -446,11 +675,25 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -458,8 +701,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{userId}}/debit",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{userId}}", "debit"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{userId}}",
+                "debit"
+              ]
             },
             "description": "Step one of the purchase saga.\n\nThe wallet row is locked FOR UPDATE for the duration, so two concurrent debits cannot both pass the sufficiency check and overdraw the account.\n\nWhen funds are short the response is **422 INSUFFICIENT_FUNDS** *and* the service publishes `PaymentFailed` on `wallet-events`. Both matter: the RPC tells this caller, and the event tells the Store orchestrator, which waits on the broker rather than holding the call open. Without the event the saga would stall forever.\n\nIn production the Store service uses a service token, not a Support one; Support is used here only because the collection has no service credential."
           }
@@ -467,11 +717,25 @@
         {
           "name": "Credit — developer revenue share (70%)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -479,8 +743,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{otherUserId}}/credit",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{otherUserId}}", "credit"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{otherUserId}}",
+                "credit"
+              ]
             },
             "description": "The developer's 70% of a 250,000 sale. The Store service computes the split — the wallet's job is to move the money reliably.\n\nThe 70/30 split itself is exact whatever the price: the platform's money type allocates by largest remainder, so the two shares always add back up to the original with no unit lost or invented."
           }
@@ -488,11 +759,25 @@
         {
           "name": "Transfer — settle a marketplace trade",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -500,8 +785,13 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/transfers",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "transfers"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "transfers"
+              ]
             },
             "description": "Debits the buyer and credits the seller in **one transaction**: either both sides move or neither does. Two separate calls would leave a window in which the buyer has paid and the seller has not been paid.\n\nBoth wallet rows are locked in a canonical order (by user id), which is what stops two opposite trades between the same pair of users from deadlocking each other.\n\nUsers cannot call this — only a service or staff — because otherwise anybody could pull funds out of somebody else's wallet."
           }
@@ -509,11 +799,25 @@
         {
           "name": "Refund a purchase",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -521,8 +825,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{userId}}/credit",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{userId}}", "credit"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{userId}}",
+                "credit"
+              ]
             },
             "description": "Returns money to a buyer.\n\nThe twelve-hour refund window and the \"gifts are not refundable\" rule belong to the **Store** service: it owns the order and its timestamp. The wallet's job is to move the money reliably when told to, and to record it as REFUND so the history reads correctly.\n\nThe matching clawback from the developer is a DEBIT with reason REVERSAL. If the developer has already spent their share, that debit fails with INSUFFICIENT_FUNDS and lands in the dead-letter queue for a human — which is the honest outcome, not something to paper over."
           }
@@ -555,11 +866,25 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -567,8 +892,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{userId}}/holds",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{userId}}", "holds"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{userId}}",
+                "holds"
+              ]
             },
             "description": "Reserves part of the balance for a pre-order or an instalment plan.\n\n**No money moves and nothing is appended to the ledger** — the balance is unchanged, only how much of it is spendable. Keeping holds out of the ledger is what lets reconciliation stay a simple sum.\n\nThe held amount cannot then be spent on anything else: try the Debit request for more than `available` and it returns INSUFFICIENT_FUNDS even though the total balance would cover it.\n\nThe TTL matters. Without it an abandoned pre-order would reserve a user's money indefinitely; the sweeper releases lapsed holds every few minutes."
           }
@@ -579,20 +911,46 @@
             "method": "GET",
             "url": {
               "raw": "{{walletBase}}/v1/wallets/me/holds?status=ACTIVE",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "me", "holds"],
-              "query": [{ "key": "status", "value": "ACTIVE" }]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "me",
+                "holds"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                }
+              ]
             }
           }
         },
         {
           "name": "Capture an instalment",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -600,8 +958,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/holds/{{holdId}}/capture",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "holds", "{{holdId}}", "capture"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "holds",
+                "{{holdId}}",
+                "capture"
+              ]
             },
             "description": "Turns part of a reservation into a real debit — one instalment of three.\n\nA partial capture leaves the remainder reserved for the next instalment; only a full draw-down closes the hold. Omit `amount` entirely to capture everything remaining, which is the common case for a single-shot pre-order.\n\nAn expired hold cannot be captured, even before the sweeper has flipped its status: the reservation has lapsed and the money belongs to the user again."
           }
@@ -609,13 +974,33 @@
         {
           "name": "Release a hold",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
-            "header": [{ "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
             "url": {
               "raw": "{{walletBase}}/v1/holds/{{holdId}}/release",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "holds", "{{holdId}}", "release"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "holds",
+                "{{holdId}}",
+                "release"
+              ]
             },
             "description": "Returns the uncaptured remainder to the available balance and closes the hold. Writes no ledger entry, because no money moved."
           }
@@ -628,11 +1013,25 @@
         {
           "name": "Issue a discount code (Admin)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -640,8 +1039,13 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/discount-codes",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "discount-codes"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "discount-codes"
+              ]
             },
             "description": "20% off (2000 basis points), capped at 200,000, on orders of 100,000 or more, usable five times.\n\nPercentages are in basis points because a float would not represent 0.1 exactly, and a discount engine that drifts is one that eventually disagrees with an invoice. Omitting `max_redemptions` makes the code single-use — the safe default for anything that gives money away."
           }
@@ -667,15 +1071,27 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"order_amount\": { \"amount_minor\": \"500000\", \"currency\": \"IRR\" }\n}"
             },
             "url": {
               "raw": "{{walletBase}}/v1/discount-codes/{{discountCode}}/preview",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "discount-codes", "{{discountCode}}", "preview"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "discount-codes",
+                "{{discountCode}}",
+                "preview"
+              ]
             },
             "description": "Computes the discount **without consuming a redemption**. The Store service calls this on every checkout render, so it has to be free of side effects — run it ten times and `redemption_count` stays at zero.\n\nA fixed-amount code larger than the order is clamped to the order, so a discount can never become a payout."
           }
@@ -683,11 +1099,25 @@
         {
           "name": "Redeem a discount",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -695,8 +1125,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/discount-codes/{{discountCode}}/redeem",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "discount-codes", "{{discountCode}}", "redeem"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "discount-codes",
+                "{{discountCode}}",
+                "redeem"
+              ]
             },
             "description": "Consumes one redemption and returns the amount the buyer still owes.\n\nMoves no money by itself — the Store service applies the discount to the order it is about to charge. The code row is still locked FOR UPDATE, because two concurrent checkouts must not both consume the last allowance of a single-use code."
           }
@@ -707,8 +1144,14 @@
             "method": "GET",
             "url": {
               "raw": "{{walletBase}}/v1/discount-codes/{{discountCode}}",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "discount-codes", "{{discountCode}}"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "discount-codes",
+                "{{discountCode}}"
+              ]
             }
           }
         }
@@ -751,11 +1194,25 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{pinnedIdempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{pinnedIdempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -763,8 +1220,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{userId}}/credit",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{userId}}", "credit"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{userId}}",
+                "credit"
+              ]
             }
           }
         },
@@ -795,11 +1259,25 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{pinnedIdempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{pinnedIdempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -807,8 +1285,15 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/wallets/{{userId}}/credit",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "wallets", "{{userId}}", "credit"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "wallets",
+                "{{userId}}",
+                "credit"
+              ]
             },
             "description": "The identical request again, with the identical key — exactly what a client does when its connection drops mid-request.\n\nThe response carries `idempotent_replay: true`, the same ledger entry id, and an unchanged balance. Nothing new was written and no event was published, so nothing downstream sees a second movement.\n\nNow change the amount and re-send: the service returns **409 IDEMPOTENCY_KEY_REUSED**. Reusing a key for a different payload is a client bug, and quietly returning the old answer would hide it."
           }
@@ -835,13 +1320,33 @@
             }
           ],
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "url": {
               "raw": "{{walletBase}}/v1/admin/reconcile",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "admin", "reconcile"],
-              "query": [{ "key": "user_id", "value": "{{userId}}", "disabled": true }]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "reconcile"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{userId}}",
+                  "disabled": true
+                }
+              ]
             },
             "description": "Verifies that every wallet balance equals the sum of its ledger entries.\n\nThis is the service's most important safety net. The balance column is a cached projection of the ledger; if the two disagree, either a bug wrote a balance without an entry or somebody edited the database by hand. **`mismatches` must always be empty.** The scheduler runs this automatically and a non-zero result pages on-call.\n\nA report of mismatches is still a successful report, so this returns 200 either way — the alert comes from the metric, not the status code."
           }
@@ -849,14 +1354,37 @@
         {
           "name": "Accrue interest (dry run)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}"
+                }
+              ]
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"dry_run\": true\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dry_run\": true\n}"
+            },
             "url": {
               "raw": "{{walletBase}}/v1/admin/interest/accrue",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "admin", "interest", "accrue"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "interest",
+                "accrue"
+              ]
             },
             "description": "Reports what a day's interest accrual would pay, without paying it.\n\nInterest is accrued **daily** rather than annually: a yearly lump sum would reward whoever happened to hold a large balance on one particular day and pay nothing to a user who kept money in the wallet for eleven months. Every amount is integer arithmetic rounded down, so the platform can never over-pay.\n\nDrop `dry_run` to credit for real. Re-running the same date is a no-op — the per-wallet-per-date idempotency key means a retried nightly job does not pay everyone twice."
           }
@@ -864,17 +1392,38 @@
         {
           "name": "Freeze a wallet (Support)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"gift card abuse investigation, ticket ARC-1234\"\n}"
             },
             "url": {
               "raw": "{{walletBase}}/v1/admin/wallets/{{otherUserId}}/freeze",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "admin", "wallets", "{{otherUserId}}", "freeze"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "wallets",
+                "{{otherUserId}}",
+                "freeze"
+              ]
             },
             "description": "Suspends all movement on a wallet.\n\nA reason is mandatory: freezing locks a user out of their own money, and an unexplained freeze is neither auditable nor defensible.\n\nFreezing blocks **credits as well as debits**. Letting money in but not out would leave a balance hostage with no way to reconcile it."
           }
@@ -882,25 +1431,63 @@
         {
           "name": "Unfreeze a wallet (Support)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"cleared by support\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"cleared by support\"\n}"
+            },
             "url": {
               "raw": "{{walletBase}}/v1/admin/wallets/{{otherUserId}}/unfreeze",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "admin", "wallets", "{{otherUserId}}", "unfreeze"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "wallets",
+                "{{otherUserId}}",
+                "unfreeze"
+              ]
             }
           }
         },
         {
           "name": "Manual adjustment (Admin)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -908,8 +1495,16 @@
             },
             "url": {
               "raw": "{{walletBase}}/v1/admin/wallets/{{userId}}/adjust",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "admin", "wallets", "{{userId}}", "adjust"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "wallets",
+                "{{userId}}",
+                "adjust"
+              ]
             },
             "description": "A manual balance correction. **Admin only** — Support can freeze wallets and issue gift cards, but minting balance out of nothing is not theirs.\n\nThis exists because reality occasionally requires it: a failed refund, a duplicated credit found during reconciliation. It is the only operation that changes a balance without an upstream business event, so it demands a written justification and lands in the ledger as ADJUSTMENT attributed to the operator who made it.\n\nEven an Admin cannot drive a balance negative: a DEBIT adjustment beyond the available balance is refused."
           }
@@ -917,16 +1512,38 @@
         {
           "name": "List gift cards (Support)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "GET",
             "url": {
               "raw": "{{walletBase}}/v1/gift-cards?status=USED&page=1&page_size=20",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "gift-cards"],
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "gift-cards"
+              ],
               "query": [
-                { "key": "status", "value": "USED" },
-                { "key": "page", "value": "1" },
-                { "key": "page_size", "value": "20" }
+                {
+                  "key": "status",
+                  "value": "USED"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                }
               ]
             },
             "description": "Note that `code` is empty on every card and only `code_hint` (the last four characters) is shown. The plaintext is not stored, and a support screen is a poor place to display a bearer instrument even if it were."
@@ -935,17 +1552,37 @@
         {
           "name": "Revoke a gift card (Support)",
           "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supportToken}}" }] },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supportToken}}"
+                }
+              ]
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"batch printed with the wrong value\"\n}"
             },
             "url": {
               "raw": "{{walletBase}}/v1/gift-cards/{{giftCardId}}/revoke",
-              "host": ["{{walletBase}}"],
-              "path": ["v1", "gift-cards", "{{giftCardId}}", "revoke"]
+              "host": [
+                "{{walletBase}}"
+              ],
+              "path": [
+                "v1",
+                "gift-cards",
+                "{{giftCardId}}",
+                "revoke"
+              ]
             },
             "description": "Cancels an unredeemed card. A reason is required, because a revocation destroys value somebody may have been promised.\n\nA card that has already been redeemed **cannot** be revoked: clawing money back out of a wallet is an adjustment, not a revocation."
           }
@@ -962,8 +1599,14 @@
             "method": "GET",
             "url": {
               "raw": "{{paymentBase}}/v1/payments/{{paymentIntentId}}",
-              "host": ["{{paymentBase}}"],
-              "path": ["v1", "payments", "{{paymentIntentId}}"]
+              "host": [
+                "{{paymentBase}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{paymentIntentId}}"
+              ]
             },
             "description": "The state machine is CREATED → PENDING → CONFIRMED | FAILED | EXPIRED, with CANCELED reachable from either non-terminal state.\n\nA user may only see their own payments. Asking for somebody else's returns **404 rather than 403**, because confirming that an id exists but belongs to another user is itself a small leak."
           }
@@ -974,12 +1617,27 @@
             "method": "GET",
             "url": {
               "raw": "{{paymentBase}}/v1/payments?page=1&page_size=20",
-              "host": ["{{paymentBase}}"],
-              "path": ["v1", "payments"],
+              "host": [
+                "{{paymentBase}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "page_size", "value": "20" },
-                { "key": "state", "value": "CONFIRMED", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                },
+                {
+                  "key": "state",
+                  "value": "CONFIRMED",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -990,8 +1648,15 @@
             "method": "POST",
             "url": {
               "raw": "{{paymentBase}}/v1/payments/{{paymentIntentId}}/verify",
-              "host": ["{{paymentBase}}"],
-              "path": ["v1", "payments", "{{paymentIntentId}}", "verify"]
+              "host": [
+                "{{paymentBase}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{paymentIntentId}}",
+                "verify"
+              ]
             },
             "description": "Asks the bank what actually happened, server to server. **This is the only authoritative settlement path.**\n\nA callback from the bank is treated as a hint about *which* payment changed, never as the verdict — the request comes from outside our trust boundary and can be forged, so a callback claiming success cannot credit a wallet on its own.\n\nThe reconciliation sweeper calls this for every payment whose callback never arrived, which is what turns \"the callback was lost\" from a support ticket into a self-healing event."
           }
@@ -1000,12 +1665,27 @@
           "name": "Cancel a payment",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"changed my mind\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"changed my mind\"\n}"
+            },
             "url": {
               "raw": "{{paymentBase}}/v1/payments/{{paymentIntentId}}/cancel",
-              "host": ["{{paymentBase}}"],
-              "path": ["v1", "payments", "{{paymentIntentId}}", "cancel"]
+              "host": [
+                "{{paymentBase}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{paymentIntentId}}",
+                "cancel"
+              ]
             },
             "description": "Abandons a payment that has not been authorised. A CONFIRMED payment cannot be cancelled — the money has already reached the wallet."
           }
@@ -1013,9 +1693,19 @@
         {
           "name": "Payment service readiness",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
-            "url": { "raw": "{{paymentBase}}/readyz", "host": ["{{paymentBase}}"], "path": ["readyz"] }
+            "url": {
+              "raw": "{{paymentBase}}/readyz",
+              "host": [
+                "{{paymentBase}}"
+              ],
+              "path": [
+                "readyz"
+              ]
+            }
           }
         }
       ]
