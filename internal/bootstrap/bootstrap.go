@@ -271,6 +271,24 @@ func (a *App) ensureTopics(ctx context.Context) error {
 		},
 	}
 
+	// The command topic this service consumes, and a DLQ per consumed topic.
+	//
+	// Creating an inbound topic looks like the producer's job, and it was left to it — with
+	// the result that nobody created wallet-commands at all, because the Store service
+	// regarded it as the wallet's and the wallet regarded it as the Store's. Broker-side
+	// auto-creation is off, so the first DebitWalletCommand was published to a topic that did
+	// not exist and the purchase sat in PENDING with no error anywhere near it.
+	//
+	// The consumer creates it because the consumer's partition count is what determines its
+	// own ordering and how far it can scale. A producer guessing that number would silently
+	// cap this service. Both sides declaring it is harmless: creation is idempotent.
+	specs = append(specs, kafkax.TopicSpec{
+		Name:              a.cfg.Kafka.WalletCommandsTopic,
+		Partitions:        a.cfg.Kafka.TopicPartitions,
+		ReplicationFactor: a.cfg.Kafka.TopicReplication,
+		RetentionMs:       financialRetention,
+	})
+
 	// A DLQ per consumed topic. Poison messages must land somewhere an operator looks,
 	// not be dropped.
 	for _, topic := range a.consumedTopics() {

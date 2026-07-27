@@ -136,13 +136,18 @@ func (l *Loader) Strings(key string, def []string) []string {
 
 // OneOf validates that the value is a member of allowed, comparing lowercase.
 func (l *Loader) OneOf(key, def string, allowed ...string) string {
-	v := strings.ToLower(l.String(key, def))
+	raw := l.String(key, def)
 	for _, a := range allowed {
-		if v == strings.ToLower(a) {
-			return v
+		if strings.EqualFold(raw, a) {
+			// The canonical spelling from the allowed list, not the caller's. Matching is
+			// case-insensitive so that JWT_ALGORITHM=hs256 is accepted, but the value has to
+			// come back as "HS256": consumers compare it against their own constants, and
+			// returning the input verbatim made a lowercase environment variable fail at boot
+			// with "unsupported algorithm".
+			return a
 		}
 	}
-	l.fail(key, fmt.Errorf("expected one of [%s], got %q", strings.Join(allowed, ", "), v))
+	l.fail(key, fmt.Errorf("expected one of [%s], got %q", strings.Join(allowed, ", "), raw))
 	return def
 }
 
