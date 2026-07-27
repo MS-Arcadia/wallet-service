@@ -1,11 +1,13 @@
 // Package health implements liveness and readiness probes.
 //
-// The two are kept distinct because Kubernetes treats them differently and
-// conflating them causes outages. Liveness answers "is this process wedged?" — if
-// it fails the pod is killed. Readiness answers "should traffic come here right
-// now?" — if it fails the pod is only removed from the Service. A database blip
-// must fail readiness, never liveness: restarting the pod would not fix Postgres
-// and would throw away in-flight work.
+// The two are kept distinct because conflating them causes outages. Liveness answers
+// "is this process wedged?" — a failure means restart me. Readiness answers "should
+// traffic come here right now?" — a failure means stop sending requests, but leave the
+// process alone. A database blip must fail readiness, never liveness: restarting would
+// not fix Postgres and would throw away in-flight work.
+//
+// Docker's HEALTHCHECK calls /readyz (through the binary's own `healthcheck`
+// subcommand); /livez is there for whatever supervises the container next.
 package health
 
 import (

@@ -58,8 +58,8 @@ type ServiceConfig struct {
 type ServerConfig struct {
 	Mode ServerMode
 	// HTTPAddr serves REST plus the probe and metrics endpoints. The operational
-	// endpoints are always served, even in grpc-only mode, because Kubernetes and
-	// Prometheus both need them.
+	// endpoints are always served, even in grpc-only mode, because the container
+	// health check and Prometheus both need them.
 	HTTPAddr        string
 	GRPCAddr        string
 	ReadTimeout     time.Duration

@@ -35,6 +35,10 @@ USER 65532:65532
 # 8080 serves REST plus /metrics, /livez and /readyz; 9090 serves gRPC.
 EXPOSE 8080 9090
 
-# No HEALTHCHECK: Kubernetes owns liveness and readiness through the probes on /livez
-# and /readyz, and a second differently-configured opinion would only confuse things.
+# The exec form is required: this image has no shell for the usual CMD-SHELL form to
+# run, which is why the binary probes itself. start-period covers migrations, which run
+# at boot before the listener opens.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["/usr/local/bin/wallet-service", "healthcheck"]
+
 ENTRYPOINT ["/usr/local/bin/wallet-service"]

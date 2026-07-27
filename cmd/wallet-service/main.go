@@ -9,7 +9,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/MS-Arcadia/wallet-service/internal/bootstrap"
 	"github.com/MS-Arcadia/wallet-service/internal/config"
@@ -21,6 +25,18 @@ import (
 var version = "dev"
 
 func main() {
+	// `wallet-service healthcheck` probes the process's own readiness endpoint and
+	// exits 0 or 1. It exists because the image is distroless: there is no shell, no
+	// curl and no wget for a Docker HEALTHCHECK to call, so the binary is the only
+	// thing in the image that can make an HTTP request.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		if err := probe(); err != nil {
+			fmt.Fprintf(os.Stderr, "unhealthy: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		// Written to stderr rather than through the logger: a configuration failure
 		// happens before the logger exists.
@@ -47,4 +63,42 @@ func run() error {
 		return err
 	}
 	return app.Run(ctx)
+}
+
+// probe reports whether the service is ready to serve traffic.
+//
+// It reads HTTP_ADDR straight from the environment instead of calling config.Load,
+// because a health check must never fail for a reason unrelated to health — loading the
+// full configuration requires secrets that are none of a probe's business.
+//
+// Readiness rather than liveness: a container that cannot reach its database should be
+// reported unhealthy, and DEGRADED (Redis down, say) deliberately still passes.
+func probe() error {
+	addr := os.Getenv("HTTP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	// ":8080" means "every interface"; a client has to name one.
+	if strings.HasPrefix(addr, ":") {
+		addr = "127.0.0.1" + addr
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+addr+"/readyz", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("/readyz returned %s", resp.Status)
+	}
+	return nil
 }

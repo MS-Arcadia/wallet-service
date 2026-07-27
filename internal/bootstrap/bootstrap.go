@@ -444,7 +444,7 @@ func (a *App) initTransports() error {
 		a.grpcServer = server
 	}
 
-	// The HTTP listener always starts, even in grpc-only mode: Kubernetes needs the
+	// The HTTP listener always starts, even in grpc-only mode: the health check needs the
 	// probes and Prometheus needs /metrics. Only the business routes are conditional.
 	a.httpServer = httpx.NewServer(httpx.ServerConfig{
 		Addr:            a.cfg.Server.HTTPAddr,

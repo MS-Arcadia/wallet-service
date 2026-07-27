@@ -21,9 +21,14 @@ To run it, the service needs Postgres, Redis and Kafka, which the [infra](../inf
 repository starts:
 
 ```bash
-cd ../infra && make images && make up
+cd ../infra && make images && make up && make wait
 curl -s localhost:8080/readyz
 ```
+
+There is no Kubernetes: the platform runs on plain Docker. The image carries a
+`HEALTHCHECK` that runs `wallet-service healthcheck`, which probes `/readyz` from inside
+the container — the image is distroless, so there is no shell or `curl` for the usual
+form to call.
 
 To exercise the API, import [`api/postman`](api/postman) into Postman, select the
 **Arcadia Local** environment, and run **Setup → Mint tokens**. The collection signs its
@@ -274,7 +279,7 @@ Both transports expose the same operations. gRPC is defined in
 | `POST /v1/admin/wallets/{userID}/adjust` | Manual correction (Admin) |
 
 Plus `/livez`, `/readyz` and `/metrics`, which are served regardless of `SERVER_MODE`
-because Kubernetes and Prometheus both need them.
+because the container health check and Prometheus both need them.
 
 ### Events
 
