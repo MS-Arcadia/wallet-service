@@ -112,6 +112,36 @@ func TestVerifyRejectsRefreshToken(t *testing.T) {
 	_, verifier := newPair(t)
 	_, err = verifier.Verify(signed)
 	require.Error(t, err)
+	// REFRESH_TOKEN_USED, not WRONG_TOKEN_TYPE. The Python services already answered this way for
+	// the same condition and these two did not, so a client branching on `reason` saw a different
+	// answer depending on which service it happened to ask. WRONG_TOKEN_TYPE now means "the token
+	// does not say what it is", which is a different mistake with a different remedy.
+	assert.Equal(t, "REFRESH_TOKEN_USED", errs.ReasonOf(err))
+}
+
+// TestVerifyRejectsATokenWithNoType covers the hole this check was widened to close.
+//
+// The claim used to be checked only when present, so a token that said nothing about itself was
+// taken to be an access token. The auth service spelled it `type` instead of `typ`, which meant
+// `typ` arrived empty — and its seven-day refresh tokens, carrying a full role, were accepted on
+// every endpoint of every service.
+func TestVerifyRejectsATokenWithNoType(t *testing.T) {
+	claims := authn.Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "user-1",
+			Issuer:    "arcadia-auth",
+			Audience:  jwt.ClaimStrings{"arcadia"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+		},
+		Role: string(authn.RoleAdmin),
+		// TokenType deliberately absent.
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testSecret))
+	require.NoError(t, err)
+
+	_, verifier := newPair(t)
+	_, err = verifier.Verify(signed)
+	require.Error(t, err, "a token that does not declare its type must not be usable")
 	assert.Equal(t, "WRONG_TOKEN_TYPE", errs.ReasonOf(err))
 }
 

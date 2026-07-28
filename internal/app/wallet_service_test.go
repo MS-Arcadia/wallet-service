@@ -754,3 +754,45 @@ func TestLedgerAlwaysSumsToTheBalance(t *testing.T) {
 	assert.Equal(t, h.balanceOf("u-1"), sum,
 		"the ledger is the source of truth; the balance column is only a projection of it")
 }
+
+// TestACreditProvisionsAMissingWallet covers the bug that stopped the first sale on a fresh
+// platform.
+//
+// The platform's own revenue wallet belongs to no registered user, so nothing provisioned it — and
+// a CreditWalletCommand for a user with no wallet was rejected as a poison message. The 30%
+// platform share went to a dead-letter topic and the order sat in PENDING forever. The end-to-end
+// suite had been creating that wallet by hand, which hid this for exactly as long as nobody
+// started from scratch.
+func TestACreditProvisionsAMissingWallet(t *testing.T) {
+	h := newHarness(t)
+	platform := "00000000-0000-4000-8000-000000000001"
+
+	result, err := h.Wallets.CreditInternal(asStoreService(), app.CreditCommand{
+		UserID:         platform,
+		Amount:         irr(300_000),
+		Reason:         wallet.ReasonRevenue,
+		ReferenceID:    "order-1",
+		Description:    "platform share",
+		IdempotencyKey: "credit-order-1-platform",
+	})
+	require.NoError(t, err, "a credit for an unprovisioned wallet must land, not dead-letter")
+	assert.Equal(t, int64(300_000), result.Wallet.Balance.Minor())
+	assert.Equal(t, int64(300_000), h.balanceOf(platform))
+}
+
+// TestADebitStillRefusesAMissingWallet is the other half, and the reason the fix is keyed on
+// direction: there is no balance to take from, and creating an empty wallet in order to overdraw it
+// would be worse than the error.
+func TestADebitStillRefusesAMissingWallet(t *testing.T) {
+	h := newHarness(t)
+
+	_, err := h.Wallets.DebitInternal(asStoreService(), app.DebitCommand{
+		UserID:         "00000000-0000-4000-8000-0000000000ff",
+		Amount:         irr(1_000),
+		Reason:         wallet.ReasonPurchase,
+		ReferenceID:    "order-2",
+		IdempotencyKey: "debit-nowhere",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errs.CodeNotFound, errs.CodeOf(err))
+}

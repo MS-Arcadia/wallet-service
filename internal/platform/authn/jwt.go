@@ -177,9 +177,18 @@ func (v *Verifier) Verify(tokenString string) (Principal, error) {
 		return Principal{}, errs.Unauthenticated("the access token is invalid").WithReason("TOKEN_INVALID")
 	}
 
-	if claims.TokenType != "" && !strings.EqualFold(claims.TokenType, "access") {
-		return Principal{}, errs.Unauthenticated("a refresh token cannot be used to call the API").
-			WithReason("WRONG_TOKEN_TYPE")
+	// Required, not merely checked when present. This used to allow an empty TokenType through
+	// on the grounds that an older token might not carry one — and the auth service spelled the
+	// claim `type`, so `typ` arrived empty and its seven-day refresh tokens, carrying a full
+	// role, were accepted on every endpoint. Demanding the claim closes that for any future
+	// issuer as well, and every issuer on the platform already sets it.
+	if !strings.EqualFold(claims.TokenType, "access") {
+		reason := "WRONG_TOKEN_TYPE"
+		if strings.EqualFold(claims.TokenType, "refresh") {
+			reason = "REFRESH_TOKEN_USED"
+		}
+		return Principal{}, errs.Unauthenticated("only an access token may be used to call the API").
+			WithReason(reason)
 	}
 	if claims.Subject == "" {
 		return Principal{}, errs.Unauthenticated("the access token has no subject").

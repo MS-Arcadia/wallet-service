@@ -282,16 +282,22 @@ func (a *App) ensureTopics(ctx context.Context) error {
 	// The consumer creates it because the consumer's partition count is what determines its
 	// own ordering and how far it can scale. A producer guessing that number would silently
 	// cap this service. Both sides declaring it is harmless: creation is idempotent.
-	specs = append(specs, kafkax.TopicSpec{
-		Name:              a.cfg.Kafka.WalletCommandsTopic,
-		Partitions:        a.cfg.Kafka.TopicPartitions,
-		ReplicationFactor: a.cfg.Kafka.TopicReplication,
-		RetentionMs:       financialRetention,
-	})
-
-	// A DLQ per consumed topic. Poison messages must land somewhere an operator looks,
-	// not be dropped.
+	//
+	// This applied to wallet-commands only, and the same argument covers every consumed topic —
+	// which the second half of the bug proved. `user-events` was never created here, only its
+	// DLQ, so on a cold start this service subscribed to a topic that did not exist yet and its
+	// client never went back for it. Whether a new account got a wallet depended on whether the
+	// auth service happened to create the topic before this consumer started: it worked after a
+	// restart and not on a fresh `make up`, which is the worst kind of intermittent.
 	for _, topic := range a.consumedTopics() {
+		specs = append(specs, kafkax.TopicSpec{
+			Name:              topic,
+			Partitions:        a.cfg.Kafka.TopicPartitions,
+			ReplicationFactor: a.cfg.Kafka.TopicReplication,
+			RetentionMs:       financialRetention,
+		})
+		// A DLQ per consumed topic. Poison messages must land somewhere an operator looks,
+		// not be dropped.
 		specs = append(specs, kafkax.TopicSpec{
 			Name:              topic + ".dlq",
 			Partitions:        1,

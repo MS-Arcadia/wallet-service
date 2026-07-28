@@ -422,6 +422,34 @@ func (s *WalletService) TransferInternal(ctx context.Context, cmd TransferComman
 	return s.Transfer(asService(ctx), cmd)
 }
 
+// createWallet inserts a wallet inside a caller's transaction and emits WalletCreated.
+//
+// Extracted from GetOrCreateWallet so that a credit arriving for an unknown user can provision one
+// without a second transaction — the movement and the creation have to commit together, or a crash
+// between them leaves a wallet with no money and an event saying money moved.
+func (s *WalletService) createWallet(ctx context.Context, tx port.Tx, userID string) (*wallet.Wallet, error) {
+	now := s.deps.Clock.Now()
+	w, err := wallet.New(s.deps.IDs.NewID(), userID, s.deps.Currency, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.deps.Wallets.Insert(ctx, tx, w); err != nil {
+		// A concurrent creator won the unique index. Theirs is as good as ours.
+		if errs.Is(err, errs.CodeAlreadyExists) {
+			return s.deps.Wallets.FindByUserID(ctx, tx, userID)
+		}
+		return nil, err
+	}
+	if err := s.emit(ctx, tx, EventWalletCreated, aggregateWallet, w.ID(), now, WalletCreatedPayload{
+		WalletID: w.ID(),
+		UserID:   userID,
+		Currency: w.Currency(),
+	}); err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
 // movementRequest is the internal shape shared by Debit, Credit and Adjust.
 type movementRequest struct {
 	Operation      string
@@ -457,6 +485,25 @@ func (s *WalletService) applyMovement(ctx context.Context, req movementRequest) 
 		// FOR UPDATE. Two concurrent debits on one wallet must not both read the same
 		// balance, both pass the sufficiency check, and together overdraw the account.
 		w, err := s.deps.Wallets.LockByUserID(ctx, tx, req.UserID)
+		if errs.Is(err, errs.CodeNotFound) && req.Direction == wallet.DirectionCredit {
+			// Money arriving for somebody with no wallet yet. Create one rather than refuse.
+			//
+			// The direction is the whole argument. A debit against a wallet that does not exist
+			// must fail — there is no balance to take from, and creating an empty one to overdraw
+			// would be worse than the error. A credit is the opposite: the money exists, it has
+			// been committed by another service, and refusing it does not send it back. It
+			// dead-letters, which is money stuck in a queue nobody reconciles.
+			//
+			// This was live. The platform's own revenue wallet belongs to no registered user, so
+			// nothing ever provisioned it, and on a fresh deployment the *first sale on the
+			// platform* dead-lettered its 30% platform credit and the order sat in PENDING
+			// forever. The end-to-end suite had been provisioning it by hand, which hid the bug
+			// for exactly as long as nobody started from scratch.
+			if _, createErr := s.createWallet(ctx, tx, req.UserID); createErr != nil {
+				return createErr
+			}
+			w, err = s.deps.Wallets.LockByUserID(ctx, tx, req.UserID)
+		}
 		if err != nil {
 			return err
 		}
