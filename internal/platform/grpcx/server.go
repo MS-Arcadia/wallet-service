@@ -371,8 +371,18 @@ type ClientConfig struct {
 	Target string
 	// Timeout is the per-call deadline applied by the client interceptor.
 	Timeout time.Duration
-	// ServiceToken is a bearer token identifying this service to the callee.
+	// ServiceToken is a statically injected bearer token identifying this service to the
+	// callee. Left for a deployment where a real Auth service issues one.
 	ServiceToken string
+
+	// TokenSource mints a token per call, and takes precedence over ServiceToken.
+	//
+	// A function rather than a string because a service credential should be short-lived, and
+	// a value read once at boot cannot be. Nil means the calls go out anonymous — which is a
+	// legitimate configuration, and also exactly how the wallet's top-up came to fail: the
+	// callee requires a principal, the caller sent none, and the refusal surfaced to an end
+	// user as though *their* login had expired.
+	TokenSource func() (string, error)
 	// ServiceName is used for span attribution.
 	ServiceName string
 }
@@ -395,7 +405,7 @@ func Dial(cfg ClientConfig, logger *slog.Logger) (*grpc.ClientConn, error) {
 		// HTTP/2 over the pod network.
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(
-			clientCorrelationInterceptor(cfg.ServiceToken),
+			clientCorrelationInterceptor(cfg.tokenSource(), logger),
 			clientTimeoutInterceptor(cfg.Timeout),
 		),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
@@ -419,19 +429,45 @@ func Dial(cfg ClientConfig, logger *slog.Logger) (*grpc.ClientConn, error) {
 		slog.String("component", "grpc-client"),
 		slog.String("target", cfg.Target),
 		slog.Duration("timeout", cfg.Timeout),
-		slog.Bool("service_token", cfg.ServiceToken != ""),
+		slog.Bool("authenticated", cfg.tokenSource() != nil),
 	)
 	return conn, nil
 }
 
-func clientCorrelationInterceptor(serviceToken string) grpc.UnaryClientInterceptor {
+// tokenSource resolves the two ways of configuring a credential into one, so the interceptor
+// has a single shape to deal with. Nil means anonymous.
+func (c ClientConfig) tokenSource() func() (string, error) {
+	if c.TokenSource != nil {
+		return c.TokenSource
+	}
+	if c.ServiceToken != "" {
+		token := c.ServiceToken
+		return func() (string, error) { return token, nil }
+	}
+	return nil
+}
+
+func clientCorrelationInterceptor(token func() (string, error), logger *slog.Logger) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		pairs := make([]string, 0, 4)
 		if correlationID := logx.CorrelationID(ctx); correlationID != "" {
 			pairs = append(pairs, MetaCorrelationID, correlationID)
 		}
-		if serviceToken != "" {
-			pairs = append(pairs, MetaAuthorization, "Bearer "+serviceToken)
+		if token != nil {
+			credential, err := token()
+			if err != nil {
+				// Refused here rather than sent anonymous. An anonymous call to a callee that
+				// requires a principal comes back as Unauthenticated, which reads like the end
+				// user's problem; failing at the source names the real one.
+				logger.Error("could not mint a service token for an outbound call",
+					slog.String("component", "grpc-client"),
+					slog.String("method", method),
+					slog.String("error", err.Error()))
+				return errs.ToGRPC(errs.Unavailable(
+					"this service could not authenticate itself to %s", cc.Target()).
+					WithReason("SERVICE_TOKEN_UNAVAILABLE").WithCause(err))
+			}
+			pairs = append(pairs, MetaAuthorization, "Bearer "+credential)
 		}
 		if len(pairs) > 0 {
 			ctx = metadata.AppendToOutgoingContext(ctx, pairs...)

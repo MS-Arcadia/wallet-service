@@ -380,10 +380,15 @@ func (a *App) initUseCases(ctx context.Context) error {
 	// than panicking.
 	var gateway port.PaymentGateway = unavailableGateway{}
 	if a.cfg.Payment.GRPCTarget != "" {
+		tokens, err := a.serviceTokenSource()
+		if err != nil {
+			return fmt.Errorf("bootstrap: payment adapter credentials: %w", err)
+		}
 		conn, err := grpcx.Dial(grpcx.ClientConfig{
 			Target:       a.cfg.Payment.GRPCTarget,
 			Timeout:      a.cfg.Payment.Timeout,
 			ServiceToken: a.cfg.Auth.ServiceToken,
+			TokenSource:  tokens,
 			ServiceName:  a.cfg.Service.Name,
 		}, a.logger)
 		if err != nil {
@@ -422,6 +427,55 @@ func (a *App) initUseCases(ctx context.Context) error {
 	a.charges = app.NewChargeService(deps)
 	a.admin = app.NewAdminService(deps, interestPolicy)
 	return nil
+}
+
+// serviceTokenSource mints the credential this service presents when it calls another one.
+//
+// Nil when SERVICE_TOKEN is set — that is a deployment where a real Auth service issues the
+// credential, and self-signing over the top of it would be wrong.
+//
+// Otherwise the wallet signs its own, short-lived, with the shared HS256 secret it already holds
+// to verify incoming tokens. That is the same thing the order service does to call this service's
+// discount API, and it is only possible because the platform uses a symmetric secret — under
+// RS256 this would need a private key the wallet has no business holding, and the answer would be
+// an Auth service.
+//
+// This exists because the Payment Adapter's InitiatePayment requires a principal and its comment
+// said "the wallet service calls this with a service token" — while the wallet sent nothing at
+// all. Every bank top-up failed, and it failed as a 401, which tells a user to log in again.
+func (a *App) serviceTokenSource() (func() (string, error), error) {
+	if a.cfg.Auth.ServiceToken != "" {
+		return nil, nil
+	}
+	if a.cfg.Auth.Algorithm != "HS256" {
+		// Said plainly rather than falling back to anonymous, which is how this broke the first
+		// time: the call goes out unauthenticated and the failure appears three services away.
+		return nil, fmt.Errorf(
+			"SERVICE_TOKEN is required with JWT_ALGORITHM=%s: this service can only sign its "+
+				"own credential when the platform uses a symmetric secret",
+			a.cfg.Auth.Algorithm)
+	}
+
+	issuer, err := authn.NewIssuer(authn.IssuerConfig{
+		Secret:   a.cfg.Auth.Secret,
+		Issuer:   a.cfg.Auth.Issuer,
+		Audience: a.cfg.Auth.Audience,
+		// Short, and re-minted per call. A long-lived service credential in memory is a
+		// credential that outlives whatever leaks it.
+		TTL: 5 * time.Minute,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("service token issuer: %w", err)
+	}
+
+	name := a.cfg.Service.Name
+	now := clock.System{}
+	return func() (string, error) {
+		// The subject is the service's name, not a user id. The callee only compares it against
+		// the user a payment is for and never stores it, so a self-describing string is more use
+		// in a log than a synthetic UUID would be.
+		return issuer.Issue(name, authn.RoleService, "", now.Now())
+	}, nil
 }
 
 func (a *App) initTransports() error {

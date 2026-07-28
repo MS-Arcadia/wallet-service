@@ -55,7 +55,7 @@ func (c *Client) InitiatePayment(ctx context.Context, req port.PaymentRequest) (
 		// Translate the transport error back into the platform taxonomy so that the use
 		// case sees "the dependency is unavailable" rather than a gRPC status it would
 		// have to know how to interpret.
-		return port.PaymentIntent{}, errs.Wrap(errs.FromGRPC(err),
+		return port.PaymentIntent{}, c.translate(err,
 			"the payment adapter could not start a top-up for user %s", req.UserID)
 	}
 	if response.GetIntent() == nil {
@@ -69,13 +69,43 @@ func (c *Client) InitiatePayment(ctx context.Context, req port.PaymentRequest) (
 func (c *Client) GetPaymentIntent(ctx context.Context, id string) (port.PaymentIntent, error) {
 	response, err := c.client.GetPaymentIntent(ctx, &paymentv1.GetPaymentIntentRequest{Id: id})
 	if err != nil {
-		return port.PaymentIntent{}, errs.Wrap(errs.FromGRPC(err),
-			"could not read payment intent %s", id)
+		return port.PaymentIntent{}, c.translate(err, "could not read payment intent %s", id)
 	}
 	if response.GetIntent() == nil {
 		return port.PaymentIntent{}, errs.NotFound("no payment intent exists with id %s", id)
 	}
 	return toPortIntent(response.GetIntent())
+}
+
+// translate turns a gRPC error from the adapter into a platform error, reclassifying the two
+// statuses that must not be passed through.
+//
+// UNAUTHENTICATED and PERMISSION_DENIED here mean *this service* was refused — a missing or
+// rejected service credential, which is a deployment fault. Forwarded unchanged they reach the
+// end user as 401 or 403, telling them to log in again for something their own session had
+// nothing to do with. That is exactly what happened: every bank top-up failed as a 401 because
+// the wallet sent no service token at all, and the error blamed the buyer.
+//
+// Reclassified as UNAVAILABLE — 503 — because from the caller's side that is the truth: the
+// feature is temporarily not working and nothing they can do affects it. Logged at error,
+// because unlike a genuine outage this one needs somebody to fix configuration.
+//
+// Every other status is passed through. A NOT_FOUND for an intent really is not found, and an
+// INVALID_ARGUMENT really was a bad request.
+func (c *Client) translate(err error, format string, args ...any) error {
+	translated := errs.FromGRPC(err)
+
+	switch errs.CodeOf(translated) {
+	case errs.CodeUnauthenticated, errs.CodePermissionDenied:
+		c.logger.Error("the payment adapter refused this service's credentials",
+			slog.String("error", err.Error()))
+		return errs.Wrap(
+			errs.Unavailable("the payment adapter is not accepting requests from this service").
+				WithReason("PAYMENT_GATEWAY_UNAUTHORIZED"),
+			format, args...)
+	default:
+		return errs.Wrap(translated, format, args...)
+	}
 }
 
 func toPortIntent(intent *paymentv1.PaymentIntent) (port.PaymentIntent, error) {
