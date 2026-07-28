@@ -422,6 +422,35 @@ func PathValue(r *http.Request, name string) (string, error) {
 	return value, nil
 }
 
+// PathUUID reads a path parameter that must be a UUID.
+//
+// Without this, a malformed id travels all the way to PostgreSQL and comes back as
+// `invalid input syntax for type uuid` — a 500 with a database error in the log, for a request
+// the caller simply got wrong. The status was the visible half of the problem; the worse half is
+// that an unvalidated path parameter reaching a query is the shape of a whole class of bugs, so
+// this is checked at the edge where the value enters the system.
+//
+// 400, not 404. A well-formed id that does not exist is a missing resource and is already a 404
+// from the repository; "null" is not an id at all, and telling a client the resource was not
+// found would send them looking for it.
+func PathUUID(r *http.Request, name string) (string, error) {
+	value, err := PathValue(r, name)
+	if err != nil {
+		return "", err
+	}
+	parsed, err := uuid.Parse(value)
+	if err != nil {
+		// The offending value is echoed because it came from the caller's own URL — there is
+		// nothing to leak, and "the id is not a UUID" without saying which id is not actionable
+		// on a page that makes several of these calls.
+		return "", errs.InvalidArgument("the path parameter %q must be a UUID, got %q", name, value)
+	}
+	// The canonical form, so a valid but oddly-cased or brace-wrapped id becomes the same string
+	// every layer below sees. uuid.Parse accepts `{...}` and `urn:uuid:...`; the database does
+	// not, and passing the raw value through would move this bug one layer down.
+	return parsed.String(), nil
+}
+
 // QueryInt reads an integer query parameter, returning def when absent.
 func QueryInt(r *http.Request, name string, def int) (int, error) {
 	raw := strings.TrimSpace(r.URL.Query().Get(name))

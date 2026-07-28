@@ -203,7 +203,7 @@ func (a *API) getMyWallet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getWallet(w http.ResponseWriter, r *http.Request) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -221,7 +221,7 @@ func (a *API) listMyLedger(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listLedger(w http.ResponseWriter, r *http.Request) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -319,7 +319,7 @@ func (a *API) listMyHolds(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) debit(w http.ResponseWriter, r *http.Request) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -351,7 +351,7 @@ func (a *API) debit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) credit(w http.ResponseWriter, r *http.Request) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -433,7 +433,7 @@ func (a *API) initiateCharge(w http.ResponseWriter, r *http.Request) {
 // --- Hold handlers --------------------------------------------------------
 
 func (a *API) holdFunds(w http.ResponseWriter, r *http.Request) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -460,7 +460,7 @@ func (a *API) holdFunds(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) captureHold(w http.ResponseWriter, r *http.Request) {
-	holdID, err := httpx.PathValue(r, "holdID")
+	holdID, err := httpx.PathUUID(r, "holdID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -496,7 +496,7 @@ func (a *API) captureHold(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) releaseHold(w http.ResponseWriter, r *http.Request) {
-	holdID, err := httpx.PathValue(r, "holdID")
+	holdID, err := httpx.PathUUID(r, "holdID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -557,7 +557,7 @@ func (a *API) redeemGiftCard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getGiftCard(w http.ResponseWriter, r *http.Request) {
-	id, err := httpx.PathValue(r, "id")
+	id, err := httpx.PathUUID(r, "id")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -600,7 +600,7 @@ func (a *API) listGiftCards(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) revokeGiftCard(w http.ResponseWriter, r *http.Request) {
-	id, err := httpx.PathValue(r, "id")
+	id, err := httpx.PathUUID(r, "id")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -761,7 +761,7 @@ func (a *API) unfreezeWallet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) changeStatus(w http.ResponseWriter, r *http.Request, freeze bool) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -788,7 +788,7 @@ func (a *API) changeStatus(w http.ResponseWriter, r *http.Request, freeze bool) 
 }
 
 func (a *API) adjust(w http.ResponseWriter, r *http.Request) {
-	userID, err := httpx.PathValue(r, "userID")
+	userID, err := httpx.PathUUID(r, "userID")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
