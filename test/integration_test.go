@@ -22,6 +22,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -197,7 +198,7 @@ func TestMigrationsApplyAndAreIdempotent(t *testing.T) {
 func TestTheLedgerRejectsAnUpdate(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	w := f.newWallet(t, "u-immutable", 100_000)
+	w := f.newWallet(t, f.ids.NewID(), 100_000)
 
 	entries := f.entriesFor(t, w.ID())
 	require.NotEmpty(t, entries)
@@ -213,7 +214,7 @@ func TestTheLedgerRejectsAnUpdate(t *testing.T) {
 func TestTheLedgerRejectsADelete(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	w := f.newWallet(t, "u-immutable-2", 100_000)
+	w := f.newWallet(t, f.ids.NewID(), 100_000)
 
 	entries := f.entriesFor(t, w.ID())
 	require.NotEmpty(t, entries)
@@ -235,7 +236,7 @@ func (f *fixture) entriesFor(t *testing.T, walletID string) []ledger.Entry {
 func TestTheDatabaseRefusesANegativeBalance(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	w := f.newWallet(t, "u-negative", 10_000)
+	w := f.newWallet(t, f.ids.NewID(), 10_000)
 
 	// Bypass the domain entirely, the way a repair script or a future bug would.
 	_, err := f.pool.Exec(ctx,
@@ -246,7 +247,7 @@ func TestTheDatabaseRefusesANegativeBalance(t *testing.T) {
 func TestTheDatabaseRefusesHoldingMoreThanTheBalance(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	w := f.newWallet(t, "u-overheld", 10_000)
+	w := f.newWallet(t, f.ids.NewID(), 10_000)
 
 	_, err := f.pool.Exec(ctx,
 		`UPDATE wallets SET held_minor = 20000 WHERE id = $1`, w.ID())
@@ -256,9 +257,10 @@ func TestTheDatabaseRefusesHoldingMoreThanTheBalance(t *testing.T) {
 func TestOneWalletPerUser(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	f.newWallet(t, "u-unique", 0)
+	userID := f.ids.NewID()
+	f.newWallet(t, userID, 0)
 
-	second, err := wallet.New(f.ids.NewID(), "u-unique", currency, f.clock.Now())
+	second, err := wallet.New(f.ids.NewID(), userID, currency, f.clock.Now())
 	require.NoError(t, err)
 
 	err = f.txm.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
@@ -283,7 +285,8 @@ func TestConcurrentDebitsCannotOverdraw(t *testing.T) {
 		debitAmount     = 200
 		workers         = 10
 	)
-	f.newWallet(t, "u-concurrent", startingBalance)
+	userID := f.ids.NewID()
+	f.newWallet(t, userID, startingBalance)
 
 	var (
 		wg        sync.WaitGroup
@@ -300,7 +303,7 @@ func TestConcurrentDebitsCannotOverdraw(t *testing.T) {
 			err := f.txm.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 				// FOR UPDATE. Without it, every worker reads 1000, every worker decides it has
 				// enough, and the balance ends up at -1000.
-				locked, err := f.wallets.LockByUserID(ctx, tx, "u-concurrent")
+				locked, err := f.wallets.LockByUserID(ctx, tx, userID)
 				if err != nil {
 					return err
 				}
@@ -315,7 +318,7 @@ func TestConcurrentDebitsCannotOverdraw(t *testing.T) {
 					return err
 				}
 				entry, err := ledger.NewEntry(f.ids.NewID(), locked, movement, "",
-					"concurrent-debit", f.clock.Now())
+					fmt.Sprintf("concurrent-debit-%d", attempt), f.clock.Now())
 				if err != nil {
 					return err
 				}
@@ -341,7 +344,7 @@ func TestConcurrentDebitsCannotOverdraw(t *testing.T) {
 	assert.Equal(t, startingBalance/debitAmount, succeeded, "exactly five debits should fit in the balance")
 	assert.Equal(t, workers-startingBalance/debitAmount, rejected)
 
-	final, err := f.wallets.FindByUserID(ctx, f.pool, "u-concurrent")
+	final, err := f.wallets.FindByUserID(ctx, f.pool, userID)
 	require.NoError(t, err)
 	assert.True(t, final.Balance().IsZero(), "the balance should be exactly drained, never negative")
 	assert.False(t, final.Balance().IsNegative())
@@ -350,7 +353,8 @@ func TestConcurrentDebitsCannotOverdraw(t *testing.T) {
 func TestConcurrentDebitsKeepTheLedgerConsistent(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	w := f.newWallet(t, "u-ledger-race", 1_000)
+	userID := f.ids.NewID()
+	w := f.newWallet(t, userID, 1_000)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 12; i++ {
@@ -358,7 +362,7 @@ func TestConcurrentDebitsKeepTheLedgerConsistent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_ = f.txm.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-				locked, err := f.wallets.LockByUserID(ctx, tx, "u-ledger-race")
+				locked, err := f.wallets.LockByUserID(ctx, tx, userID)
 				if err != nil {
 					return err
 				}
@@ -382,7 +386,7 @@ func TestConcurrentDebitsKeepTheLedgerConsistent(t *testing.T) {
 
 	// Reconciliation must be clean whatever order the workers interleaved in: the sum of
 	// the ledger has to equal the stored balance exactly.
-	stored, err := f.wallets.FindByUserID(ctx, f.pool, "u-ledger-race")
+	stored, err := f.wallets.FindByUserID(ctx, f.pool, userID)
 	require.NoError(t, err)
 
 	ledgerBalance, err := f.ledger.SumByWallet(ctx, f.pool, w.ID())
@@ -450,11 +454,12 @@ func TestTheIdempotencyKeyIsClaimedExactlyOnce(t *testing.T) {
 func TestLedgerSequenceIsMonotonic(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
-	w := f.newWallet(t, "u-sequence", 100_000)
+	userID := f.ids.NewID()
+	w := f.newWallet(t, userID, 100_000)
 
 	for i := 0; i < 5; i++ {
 		err := f.txm.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-			locked, err := f.wallets.LockByUserID(ctx, tx, "u-sequence")
+			locked, err := f.wallets.LockByUserID(ctx, tx, userID)
 			if err != nil {
 				return err
 			}
