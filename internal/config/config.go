@@ -66,8 +66,7 @@ type ServerConfig struct {
 	WriteTimeout    time.Duration
 	HandlerTimeout  time.Duration
 	ShutdownTimeout time.Duration
-	MaxBodyBytes    int64
-	CORSOrigins     []string
+	MaxBodyBytes int64
 	// EnableReflection exposes gRPC service descriptors, so grpcurl and Postman can
 	// call the API without a local copy of the protos. Handy in development.
 	EnableReflection bool
@@ -200,7 +199,6 @@ func Load() (Config, error) {
 			HandlerTimeout:   l.Duration("HANDLER_TIMEOUT", 30*time.Second),
 			ShutdownTimeout:  l.Duration("SHUTDOWN_TIMEOUT", 20*time.Second),
 			MaxBodyBytes:     l.Int64("HTTP_MAX_BODY_BYTES", 1<<20),
-			CORSOrigins:      l.Strings("CORS_ORIGINS", []string{"http://localhost:3000"}),
 			EnableReflection: l.Bool("GRPC_REFLECTION", true),
 		},
 

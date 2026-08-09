@@ -237,41 +237,6 @@ func Authenticate(verifier *authn.Verifier) Middleware {
 	}
 }
 
-// CORS allows the Next.js front end to call the API directly during development.
-// In production traffic arrives through the gateway and this is a no-op.
-func CORS(allowedOrigins []string) Middleware {
-	allowAll := len(allowedOrigins) == 1 && allowedOrigins[0] == "*"
-	allowed := make(map[string]struct{}, len(allowedOrigins))
-	for _, origin := range allowedOrigins {
-		allowed[origin] = struct{}{}
-	}
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := r.Header.Get("Origin")
-			if origin != "" {
-				_, ok := allowed[origin]
-				if allowAll || ok {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
-					w.Header().Set("Vary", "Origin")
-					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-					w.Header().Set("Access-Control-Allow-Headers",
-						strings.Join([]string{
-							"Authorization", "Content-Type",
-							HeaderRequestID, HeaderCorrelationID, HeaderIdempotencyKey,
-						}, ", "))
-					w.Header().Set("Access-Control-Max-Age", "600")
-				}
-			}
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
 // SecurityHeaders sets conservative defaults on every response.
 func SecurityHeaders() Middleware {
 	return func(next http.Handler) http.Handler {

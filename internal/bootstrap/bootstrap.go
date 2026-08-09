@@ -556,7 +556,6 @@ func (a *App) buildHTTPHandler(verifier *authn.Verifier) http.Handler {
 		httpx.Recover(a.logger),
 		httpx.RequestID(),
 		httpx.SecurityHeaders(),
-		httpx.CORS(a.cfg.Server.CORSOrigins),
 		httpx.Logging(a.logger),
 		httpx.Instrument(a.metrics),
 		httpx.Timeout(a.cfg.Server.HandlerTimeout),
