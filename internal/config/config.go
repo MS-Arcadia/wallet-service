@@ -66,7 +66,7 @@ type ServerConfig struct {
 	WriteTimeout    time.Duration
 	HandlerTimeout  time.Duration
 	ShutdownTimeout time.Duration
-	MaxBodyBytes int64
+	MaxBodyBytes    int64
 	// EnableReflection exposes gRPC service descriptors, so grpcurl and Postman can
 	// call the API without a local copy of the protos. Handy in development.
 	EnableReflection bool
