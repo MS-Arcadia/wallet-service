@@ -126,6 +126,96 @@ the REST and gRPC paths cannot drift apart in their validation or authorisation.
 
 ---
 
+## Use cases
+
+### For the account holder
+
+| # | Use case | Notes |
+|---|---|---|
+| 1 | Read own balance | Balance, held, and available — three different numbers |
+| 2 | Read own ledger | Append-only, page-numbered |
+| 3 | Read own holds | Pre-order reservations and instalment commitments |
+| 4 | Start a bank top-up | Answers a redirect; the balance changes on confirmation, never on initiation |
+| 5 | Redeem a gift card | Repeated wrong codes flag the account for Support |
+
+### For staff
+
+| # | Use case | Actor | Notes |
+|---|---|---|---|
+| 6 | Issue gift cards | Support | A batch; codes are revealed once and only a salted hash is stored |
+| 7 | List and inspect gift cards | Support | Shows a hint, never the code |
+| 8 | Revoke a gift card | Support | |
+| 9 | Issue a discount code | Support | Percentage or fixed, capped, with redemption limits |
+| 10 | Read another user's wallet | Support | |
+| 11 | Freeze / unfreeze a wallet | Admin | A frozen wallet moves no money in either direction |
+| 12 | Adjust a balance | Admin | Recorded in the ledger like everything else |
+| 13 | Accrue daily interest | Admin / scheduler | The financial differentiator from the requirements |
+| 14 | Reconcile | Admin / scheduler | Proves every balance still equals the sum of its ledger |
+
+### Internal, driven by other services
+
+| # | Use case | Caller |
+|---|---|---|
+| 15 | Debit a wallet | order-service, purchase saga |
+| 16 | Credit a wallet | order-service — the 70/30 split |
+| 17 | Refund an order | order-service |
+| 18 | Reverse a split | order-service, on refund |
+| 19 | Place, capture, release a hold | order-service — pre-orders and instalments |
+| 20 | Settle a trade | marketplace-service — two-sided, atomic |
+| 21 | Preview and redeem a discount | order-service |
+
+## How it talks to the rest of the platform
+
+```mermaid
+graph LR
+    gw["api-gateway"] -->|"REST /wallet/*"| w["wallet-service"]
+    mk["marketplace-service"] -->|"REST: read balance"| w
+    ord["order-service"] -->|"REST: discount preview"| w
+
+    ord -->|"wallet-commands:<br/>Debit, Credit, Refund,<br/>Hold, Capture, Release"| wc(("wallet-commands"))
+    wc --> w
+    mk -->|"trade-events:<br/>SettleTradeCommand"| te(("trade-events"))
+    te --> w
+    pay["payment-service"] -->|"payment-events:<br/>PaymentConfirmed"| pe(("payment-events"))
+    pe --> w
+    auth["auth-profile-service"] -->|"user-events:<br/>UserRegistered"| ue(("user-events"))
+    ue --> w
+
+    w -->|"wallet-events:<br/>WalletDebited, WalletCredited,<br/>PaymentFailed, HoldPlaced,<br/>GiftCardAbuseDetected"| we(("wallet-events"))
+    we --> ord
+    we --> auth
+
+    w -->|"gRPC: InitiateCharge"| pay
+
+    classDef s fill:#2d7dd2,stroke:#1a5a9e,color:#fff
+    classDef t fill:#f5a623,stroke:#c4841c,color:#000
+    class gw,w,mk,ord,pay,auth s
+    class wc,te,pe,ue,we t
+```
+
+| Direction | Peer | Why |
+|---|---|---|
+| Calls out (gRPC) | payment-service | Starting a bank charge — the only synchronous outbound call |
+| Called by | marketplace-service | Reads a balance to check a buyer can pay and a seller can be paid |
+| Called by | order-service | Previews a discount code before the buyer commits |
+| Consumes | `wallet-commands` | Every money movement the purchase saga asks for |
+| Consumes | `trade-events` | Marketplace settlement — both wallets move or neither does |
+| Consumes | `payment-events` | A confirmed bank payment is what credits a top-up |
+| Consumes | `user-events` | A wallet is created when a user registers |
+| Publishes | `wallet-events` | Saga replies for Order; abuse flags for Auth |
+
+## Infrastructure
+
+| Concern | Choice |
+|---|---|
+| Language | Go 1.24 |
+| Storage | PostgreSQL — `arcadia_wallet` |
+| Messaging | Kafka, transactional outbox |
+| APIs | REST (8080) and gRPC (9090) |
+| Migrations | Embedded SQL, applied at boot, append-only |
+| Image | Distroless — no shell, so the healthcheck is a subcommand of the binary |
+| Deployment | 1 replica, HPA to 4 at 70% CPU |
+
 ## The decisions worth explaining
 
 ### Money is never a float, and never a decimal
